@@ -3,14 +3,15 @@
 //
 // SPDX-License-Identifier: MIT
 //==============================================================================
+// Example using Intel® Video Processing Library (Intel® VPL)
 
 ///
 /// Utility library header file for sample code
 ///
 /// @file
 
-#ifndef EXAMPLES_UTIL_H_
-#define EXAMPLES_UTIL_H_
+#ifndef EXAMPLES_UTIL_HPP_
+#define EXAMPLES_UTIL_HPP_
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -148,16 +149,10 @@ bool ParseArgsAndValidate(int argc, char *argv[], Params *params, ParamGroup gro
                 return false;
             }
         }
-        else if (IS_ARG_EQ(s, "hw")) {
-            params->impl = MFX_IMPL_HARDWARE;
-#if (MFX_VERSION >= 2000)
-            params->implValue.Data.U32 = MFX_IMPL_TYPE_HARDWARE;
-#endif
-        }
         else if (IS_ARG_EQ(s, "legacy")) {
             params->bLegacyGen = true;
         }
-#if defined(__linux__) && defined(ZEROCOPY)
+#ifdef ZEROCOPY
         else if (IS_ARG_EQ(s, "zerocopy")) {
             params->bZeroCopy = true;
         }
@@ -228,7 +223,7 @@ void FreeAcceleratorHandle(void *accelHandle, int fd) {
 #endif
 }
 
-// Shows implementation info with oneVPL
+// Shows implementation info with Intel® Video Processing Library (Intel® VPL)
 void ShowImplementationInfo(mfxLoader loader, mfxU32 implnum) {
     mfxImplDescription *idesc = nullptr;
     mfxStatus sts;
@@ -237,11 +232,10 @@ void ShowImplementationInfo(mfxLoader loader, mfxU32 implnum) {
     if (!idesc || (sts != MFX_ERR_NONE))
         return;
 
-    printf("\noneVPL Implementation details:\n");
+    printf("\nIntel® VPL Implementation details:\n");
     printf("    ApiVersion:           %hu.%hu  \n",
            idesc->ApiVersion.Major,
            idesc->ApiVersion.Minor);
-    printf("    Implementation type:  %s\n", (idesc->Impl == MFX_IMPL_TYPE_SOFTWARE) ? "SW" : "HW");
     printf("    AccelerationMode via: ");
     switch (idesc->AccelerationMode) {
         case MFX_ACCEL_MODE_NA:
@@ -275,6 +269,7 @@ void ShowImplementationInfo(mfxLoader loader, mfxU32 implnum) {
             printf("unknown\n");
             break;
     }
+    printf("  DeviceID:             %s \n", idesc->Dev.DeviceID);
     MFXDispReleaseImplDescription(loader, idesc);
 
 #if (MFX_VERSION >= 2004)
@@ -367,8 +362,9 @@ mfxStatus AllocateExternalSystemMemorySurfacePool(mfxU8 **buf,
 }
 
 void FreeExternalSystemMemorySurfacePool(mfxU8 *dec_buf, mfxFrameSurface1 *surfpool) {
-    if (dec_buf)
+    if (dec_buf) {
         free(dec_buf);
+    }
 
     if (surfpool)
         free(surfpool);
@@ -431,4 +427,4 @@ void PrintInputAndOutputsInfo(const ov::Model &network) {
     std::cout << std::endl;
 }
 
-#endif //EXAMPLES_UTIL_H_
+#endif //EXAMPLES_UTIL_HPP_

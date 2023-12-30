@@ -3,12 +3,10 @@
 #
 # SPDX-License-Identifier: MIT
 # ##############################################################################
-# oneAPI Video Processing Library (oneVPL) main build script
+
+cmake_minimum_required(VERSION 3.13.0)
 if(MSVC)
-  cmake_minimum_required(VERSION 3.15)
   cmake_policy(SET CMP0091 NEW)
-else()
-  cmake_minimum_required(VERSION 3.10.2)
 endif()
 
 file(STRINGS "version.txt" version_txt)
@@ -78,6 +76,32 @@ set(BUILD_TOOLS_ONEVPL_EXPERIMENTAL
 option(BUILD_DISPATCHER_ONLY "Build dispatcher only." OFF)
 option(BUILD_DEV_ONLY "Build only developer package." OFF)
 
+# Test tool options for surface sharing
+if(WIN32)
+  set(TOOLS_DEFAULT_SCREEN_CAPTURE ON)
+  set(TOOLS_DEFAULT_RENDER ON)
+  set(TOOLS_DEFAULT_OPENCL ON)
+  set(TOOLS_DEFAULT_X11 OFF)
+else()
+  set(TOOLS_DEFAULT_SCREEN_CAPTURE ON)
+  set(TOOLS_DEFAULT_RENDER ON)
+  set(TOOLS_DEFAULT_OPENCL OFF)
+  set(TOOLS_DEFAULT_X11 ON)
+endif()
+
+option(TOOLS_ENABLE_SCREEN_CAPTURE
+       "Enable screen capture in surface sharing test tools."
+       ${TOOLS_DEFAULT_SCREEN_CAPTURE})
+
+option(TOOLS_ENABLE_RENDER "Enable rendering in surface sharing test tools."
+       ${TOOLS_DEFAULT_RENDER})
+
+option(TOOLS_ENABLE_OPENCL "Enable OpenCL in surface sharing test tools."
+       ${TOOLS_DEFAULT_OPENCL})
+
+option(TOOLS_ENABLE_X11 "Enable X11 in surface sharing test tools."
+       ${TOOLS_DEFAULT_X11})
+
 if(BUILD_DISPATCHER_ONLY)
   set(BUILD_DEV OFF)
   set(BUILD_PREVIEW OFF)
@@ -99,14 +123,13 @@ if(USE_MSVC_STATIC_RUNTIME)
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
-option(USE_ONEAPI_INSTALL_LAYOUT "Use oneAPI install layout instead of FHS" OFF)
-
 # Set output directories
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 
-include(cmake/oneAPIInstallDirs.cmake)
+include(cmake/InstallDirs.cmake)
+include(cmake/PackageTarget.cmake)
 
 # Set POSITION_INDEPENDENT_CODE property for all targets
 set(CMAKE_POSITION_INDEPENDENT_CODE true)
@@ -117,42 +140,32 @@ set(CMAKE_INSTALL_SO_NO_EXE 0)
 include(cmake/CompileOptions.cmake)
 
 if(BUILD_TESTS)
-  include(Dart)
+  include(CTest)
   enable_testing()
 endif()
 
 add_subdirectory(api)
-add_subdirectory(dispatcher)
+add_subdirectory(libvpl)
 if(BUILD_TOOLS)
   add_subdirectory(tools)
 endif()
 if(BUILD_DEV)
   add_subdirectory(env)
-  add_subdirectory(modulefiles)
   add_subdirectory(examples)
 endif()
 
 install(
   FILES third-party-programs.txt
-  DESTINATION ${ONEAPI_INSTALL_LICENSEDIR}
-  COMPONENT license)
+  DESTINATION ${VPL_INSTALL_LICENSEDIR}
+  COMPONENT ${VPL_COMPONENT_LIB})
 
 install(
   FILES LICENSE
   RENAME license.txt
-  DESTINATION ${ONEAPI_INSTALL_LICENSEDIR}
-  COMPONENT license)
+  DESTINATION ${VPL_INSTALL_LICENSEDIR}
+  COMPONENT ${VPL_COMPONENT_LIB})
 
-if(USE_ONEAPI_INSTALL_LAYOUT)
-  install(
-    FILES LICENSE
-    RENAME license.txt
-    DESTINATION "licensing"
-    COMPONENT license)
-endif()
-
-include(cmake/PackageTarget.cmake)
-set(CMAKE_INSTALL_SYSTEM_RUNTIME_COMPONENT runtime)
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_COMPONENT ${VPL_COMPONENT_LIB})
 include(InstallRequiredSystemLibraries)
 
 message(
@@ -201,23 +214,18 @@ message(
 message(
   STATUS "  CMAKE_INSTALL_FULL_DOCDIR       : ${CMAKE_INSTALL_FULL_DOCDIR}")
 message(
-  STATUS
-    "  ONEAPI_INSTALL_FULL_PKGCONFIGDIR: ${ONEAPI_INSTALL_FULL_PKGCONFIGDIR}")
+  STATUS "  VPL_INSTALL_FULL_PKGCONFIGDIR   : ${VPL_INSTALL_FULL_PKGCONFIGDIR}")
 message(
-  STATUS "  ONEAPI_INSTALL_FULL_CMAKEDIR    : ${ONEAPI_INSTALL_FULL_CMAKEDIR}")
+  STATUS "  VPL_INSTALL_FULL_CMAKEDIR       : ${VPL_INSTALL_FULL_CMAKEDIR}")
+message(STATUS "  VPL_INSTALL_FULL_ENVDIR         : ${VPL_INSTALL_FULL_ENVDIR}")
 message(
-  STATUS "  ONEAPI_INSTALL_FULL_ENVDIR      : ${ONEAPI_INSTALL_FULL_ENVDIR}")
+  STATUS "  VPL_INSTALL_FULL_MODFILEDIR     : ${VPL_INSTALL_FULL_MODFILEDIR}")
 message(
-  STATUS "  ONEAPI_INSTALL_FULL_MODFILEDIR  : ${ONEAPI_INSTALL_FULL_MODFILEDIR}"
-)
+  STATUS "  VPL_INSTALL_FULL_EXAMPLEDIR     : ${VPL_INSTALL_FULL_EXAMPLEDIR}")
 message(
-  STATUS "  ONEAPI_INSTALL_FULL_EXAMPLEDIR  : ${ONEAPI_INSTALL_FULL_EXAMPLEDIR}"
-)
+  STATUS "  VPL_INSTALL_FULL_LICENSEDIR     : ${VPL_INSTALL_FULL_LICENSEDIR}")
 message(
-  STATUS "  ONEAPI_INSTALL_FULL_LICENSEDIR  : ${ONEAPI_INSTALL_FULL_LICENSEDIR}"
-)
-message(
-  STATUS "  ONEAPI_INSTALL_FULL_PYTHONDIR   : ${ONEAPI_INSTALL_FULL_PYTHONDIR}")
+  STATUS "  VPL_INSTALL_FULL_PYTHONDIR      : ${VPL_INSTALL_FULL_PYTHONDIR}")
 message(STATUS "Build:")
 message(
   STATUS "  BUILD_DISPATCHER_ONLY                : ${BUILD_DISPATCHER_ONLY}")
@@ -250,4 +258,15 @@ if(MSVC)
   message(
     STATUS "  USE_MSVC_STATIC_RUNTIME              : ${USE_MSVC_STATIC_RUNTIME}"
   )
+
 endif()
+
+message(STATUS "Surface sharing test tools:")
+message(
+  STATUS
+    "  TOOLS_ENABLE_SCREEN_CAPTURE          : ${TOOLS_ENABLE_SCREEN_CAPTURE}")
+message(
+  STATUS "  TOOLS_ENABLE_RENDER                  : ${TOOLS_ENABLE_RENDER}")
+message(
+  STATUS "  TOOLS_ENABLE_OPENCL                  : ${TOOLS_ENABLE_OPENCL}")
+message(STATUS "  TOOLS_ENABLE_X11                     : ${TOOLS_ENABLE_X11}")

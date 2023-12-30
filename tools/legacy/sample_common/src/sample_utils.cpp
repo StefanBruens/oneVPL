@@ -31,7 +31,6 @@
 
     #include <DXGI.h>
     #include <psapi.h>
-    #include <tchar.h>
     #include <windows.h>
     #include <memory>
 
@@ -102,7 +101,7 @@ CSmplYUVReader::CSmplYUVReader()
           shouldShift10BitsHigh(false),
           m_bInited(false) {}
 
-mfxStatus CSmplYUVReader::Init(std::list<msdk_string> inputs,
+mfxStatus CSmplYUVReader::Init(std::list<std::string> inputs,
                                mfxU32 ColorFormat,
                                bool enableShifting) {
     Close();
@@ -132,7 +131,7 @@ mfxStatus CSmplYUVReader::Init(std::list<msdk_string> inputs,
     for (ls_iterator it = inputs.begin(); it != inputs.end(); it++) {
         m_files.push_back(NULL);
         auto& f = m_files.back();
-        MSDK_FOPEN(f, (*it).c_str(), MSDK_STRING("rb"));
+        MSDK_FOPEN(f, (*it).c_str(), "rb");
         MSDK_CHECK_POINTER(f, MFX_ERR_NULL_PTR);
     }
 
@@ -169,8 +168,8 @@ mfxStatus CSmplYUVReader::SkipNframesFromBeginning(mfxU16 w,
     mfxU32 frameLength;
 
     if (MFX_ERR_NONE != GetFrameLength(w, h, m_ColorFormat, frameLength)) {
-        msdk_printf(MSDK_STRING("Input color format %s is unsupported in qpfile mode\n"),
-                    ColorFormatToStr(m_ColorFormat));
+        printf("Input color format %s is unsupported in qpfile mode\n",
+               ColorFormatToStr(m_ColorFormat));
         return MFX_ERR_UNSUPPORTED;
     }
 
@@ -525,18 +524,18 @@ void CSmplBitstreamWriter::Close() {
     m_bInited = false;
 }
 
-mfxStatus CSmplBitstreamWriter::Init(const msdk_char* strFileName) {
+mfxStatus CSmplBitstreamWriter::Init(const char* strFileName) {
     MSDK_CHECK_POINTER(strFileName, MFX_ERR_NULL_PTR);
-    if (!msdk_strlen(strFileName))
+    if (!strlen(strFileName))
         return MFX_ERR_NONE;
 
     Close();
 
     //init file to write encoded data
-    MSDK_FOPEN(m_fSource, strFileName, MSDK_STRING("wb+"));
+    MSDK_FOPEN(m_fSource, strFileName, "wb+");
     MSDK_CHECK_POINTER(m_fSource, MFX_ERR_NULL_PTR);
 
-    m_sFile = msdk_string(strFileName);
+    m_sFile = std::string(strFileName);
     //set init state to true in case of success
     m_bInited = true;
     return MFX_ERR_NONE;
@@ -577,7 +576,7 @@ mfxStatus CSmplBitstreamWriter::WriteNextFrame(mfxBitstream* pMfxBitstream,
 
         // print encoding progress to console every certain number of frames (not to affect performance too much)
         if (isPrint && (1 == m_nProcessedFramesNum || (0 == (m_nProcessedFramesNum % 100)))) {
-            msdk_printf(MSDK_STRING("Frame number: %u\r"), (unsigned int)m_nProcessedFramesNum);
+            printf("Frame number: %u\r", (unsigned int)m_nProcessedFramesNum);
         }
     }
     else {
@@ -686,15 +685,15 @@ CSmplBitstreamDuplicateWriter::CSmplBitstreamDuplicateWriter() : CSmplBitstreamW
     m_bJoined          = false;
 }
 
-mfxStatus CSmplBitstreamDuplicateWriter::InitDuplicate(const msdk_char* strFileName) {
+mfxStatus CSmplBitstreamDuplicateWriter::InitDuplicate(const char* strFileName) {
     MSDK_CHECK_POINTER(strFileName, MFX_ERR_NULL_PTR);
-    MSDK_CHECK_ERROR(msdk_strlen(strFileName), 0, MFX_ERR_NOT_INITIALIZED);
+    MSDK_CHECK_ERROR(strlen(strFileName), 0, MFX_ERR_NOT_INITIALIZED);
 
     if (m_fSourceDuplicate) {
         fclose(m_fSourceDuplicate);
         m_fSourceDuplicate = NULL;
     }
-    MSDK_FOPEN(m_fSourceDuplicate, strFileName, MSDK_STRING("wb+"));
+    MSDK_FOPEN(m_fSourceDuplicate, strFileName, "wb+");
     MSDK_CHECK_POINTER(m_fSourceDuplicate, MFX_ERR_NULL_PTR);
 
     m_bJoined = false; // mark we own the file handle
@@ -763,15 +762,15 @@ void CSmplBitstreamReader::Reset() {
     fseek(m_fSource, 0, SEEK_SET);
 }
 
-mfxStatus CSmplBitstreamReader::Init(const msdk_char* strFileName) {
+mfxStatus CSmplBitstreamReader::Init(const char* strFileName) {
     MSDK_CHECK_POINTER(strFileName, MFX_ERR_NULL_PTR);
-    if (!msdk_strlen(strFileName))
+    if (!strlen(strFileName))
         return MFX_ERR_NONE;
 
     Close();
 
     //open file to read input stream
-    MSDK_FOPEN(m_fSource, strFileName, MSDK_STRING("rb"));
+    MSDK_FOPEN(m_fSource, strFileName, "rb");
     MSDK_CHECK_POINTER(m_fSource, MFX_ERR_NULL_PTR);
 
     m_bInited = true;
@@ -871,7 +870,7 @@ void CIVFFrameReader::Reset() {
     std::ignore = ReadHeader();
 }
 
-mfxStatus CIVFFrameReader::Init(const msdk_char* strFileName) {
+mfxStatus CIVFFrameReader::Init(const char* strFileName) {
     mfxStatus sts = CSmplBitstreamReader::Init(strFileName);
     MSDK_CHECK_STATUS(sts, "CSmplBitstreamReader::Init failed");
 
@@ -968,7 +967,7 @@ mfxStatus CIVFFrameWriter::Reset() {
     return MFX_ERR_NONE;
 }
 
-mfxStatus CIVFFrameWriter::Init(const msdk_char* strFileName,
+mfxStatus CIVFFrameWriter::Init(const char* strFileName,
                                 const mfxU16 w,
                                 const mfxU16 h,
                                 const mfxU32 fr_nom,
@@ -1024,11 +1023,11 @@ CSmplYUVWriter::CSmplYUVWriter()
           m_sFile(),
           m_nViews(0){};
 
-mfxStatus CSmplYUVWriter::Init(const msdk_char* strFileName, const mfxU32 numViews) {
+mfxStatus CSmplYUVWriter::Init(const char* strFileName, const mfxU32 numViews) {
     MSDK_CHECK_POINTER(strFileName, MFX_ERR_NULL_PTR);
-    MSDK_CHECK_ERROR(msdk_strlen(strFileName), 0, MFX_ERR_NOT_INITIALIZED);
+    MSDK_CHECK_ERROR(strlen(strFileName), 0, MFX_ERR_NOT_INITIALIZED);
 
-    m_sFile  = msdk_string(strFileName);
+    m_sFile  = std::string(strFileName);
     m_nViews = numViews;
 
     Close();
@@ -1036,7 +1035,7 @@ mfxStatus CSmplYUVWriter::Init(const msdk_char* strFileName, const mfxU32 numVie
     //open file to write decoded data
 
     if (!m_bIsMultiView) {
-        MSDK_FOPEN(m_fDest, m_sFile.c_str(), MSDK_STRING("wb"));
+        MSDK_FOPEN(m_fDest, m_sFile.c_str(), "wb");
         MSDK_CHECK_POINTER(m_fDest, MFX_ERR_NULL_PTR);
         ++m_numCreatedFiles;
     }
@@ -1047,9 +1046,7 @@ mfxStatus CSmplYUVWriter::Init(const msdk_char* strFileName, const mfxU32 numVie
 
         m_fDestMVC = new FILE*[numViews];
         for (i = 0; i < numViews; ++i) {
-            MSDK_FOPEN(m_fDestMVC[i],
-                       FormMVCFileName(m_sFile.c_str(), i).c_str(),
-                       MSDK_STRING("wb"));
+            MSDK_FOPEN(m_fDestMVC[i], FormMVCFileName(m_sFile.c_str(), i).c_str(), "wb");
             MSDK_CHECK_POINTER(m_fDestMVC[i], MFX_ERR_NULL_PTR);
             ++m_numCreatedFiles;
         }
@@ -1153,6 +1150,9 @@ mfxStatus GetChromaSize(const mfxFrameInfo& pInfo, mfxU32& ChromaW, mfxU32& Chro
     return MFX_ERR_NONE;
 }
 
+// Size of temp buffer for shifting operation
+#define SHIFT_OP_BUFF_SIZE 8192 * 4
+
 mfxStatus CSmplYUVWriter::WriteNextFrame(mfxFrameSurface1* pSurface) {
     MSDK_CHECK_ERROR(m_bInited, false, MFX_ERR_NOT_INITIALIZED);
     MSDK_CHECK_POINTER(pSurface, MFX_ERR_NULL_PTR);
@@ -1166,7 +1166,7 @@ mfxStatus CSmplYUVWriter::WriteNextFrame(mfxFrameSurface1* pSurface) {
     mfxU32 shiftSizeLuma   = 16 - pInfo.BitDepthLuma;
     mfxU32 shiftSizeChroma = 16 - pInfo.BitDepthChroma;
     // Temporary buffer to convert MS to no-MS format
-    std::vector<mfxU16> tmp;
+    std::vector<mfxU16> tmp(SHIFT_OP_BUFF_SIZE);
 
     if (!m_bIsMultiView) {
         MSDK_CHECK_POINTER(m_fDest, MFX_ERR_NULL_PTR);
@@ -1206,8 +1206,6 @@ mfxStatus CSmplYUVWriter::WriteNextFrame(mfxFrameSurface1* pSurface) {
                                  i * pData.Pitch;
                 if (pInfo.Shift) {
                     // Bits will be shifted to the lower position
-                    tmp.resize(pInfo.CropW * 2);
-
                     for (int idx = 0; idx < pInfo.CropW * 2; idx++) {
                         tmp[idx] = ((mfxU16*)pBuffer)[idx] >> shiftSizeLuma;
                     }
@@ -1240,15 +1238,13 @@ mfxStatus CSmplYUVWriter::WriteNextFrame(mfxFrameSurface1* pSurface) {
             }
             return MFX_ERR_NONE;
         } break;
-#if (MFX_VERSION >= MFX_VERSION_NEXT)
         case MFX_FOURCC_Y416: // Luma and chroma will be filled below
         {
             for (i = 0; i < pInfo.CropH; i++) {
                 mfxU8* pBuffer = ((mfxU8*)pData.U) + (pInfo.CropY * pData.Pitch + pInfo.CropX * 8) +
                                  i * pData.Pitch;
                 if (pInfo.Shift) {
-                    tmp.resize(pInfo.CropW * 4);
-
+                    // Bits will be shifted to the lower position
                     for (int idx = 0; idx < pInfo.CropW * 4; idx++) {
                         tmp[idx] = ((mfxU16*)pBuffer)[idx] >> shiftSizeLuma;
                     }
@@ -1266,7 +1262,6 @@ mfxStatus CSmplYUVWriter::WriteNextFrame(mfxFrameSurface1* pSurface) {
             }
             return MFX_ERR_NONE;
         } break;
-#endif
         case MFX_FOURCC_I010:
         case MFX_FOURCC_I210:
             for (i = 0; i < pInfo.CropH; i++) {
@@ -1278,9 +1273,7 @@ mfxStatus CSmplYUVWriter::WriteNextFrame(mfxFrameSurface1* pSurface) {
             }
             break;
         case MFX_FOURCC_P010:
-#if (MFX_VERSION >= MFX_VERSION_NEXT)
         case MFX_FOURCC_P016:
-#endif
         case MFX_FOURCC_P210: {
             for (i = 0; i < pInfo.CropH; i++) {
                 mfxU16* shortPtr = (mfxU16*)(pData.Y + (pInfo.CropY * pData.Pitch + pInfo.CropX) +
@@ -1288,8 +1281,6 @@ mfxStatus CSmplYUVWriter::WriteNextFrame(mfxFrameSurface1* pSurface) {
                 if (pInfo.Shift) {
                     // Convert MS-P*1* to P*1* and write
                     // Bits will be shifted to the lower position
-                    tmp.resize(pData.Pitch);
-
                     for (int idx = 0; idx < pInfo.CropW; idx++) {
                         tmp[idx] = shortPtr[idx] >> shiftSizeLuma;
                     }
@@ -1411,9 +1402,7 @@ mfxStatus CSmplYUVWriter::WriteNextFrame(mfxFrameSurface1* pSurface) {
             break;
         }
         case MFX_FOURCC_P010:
-#if (MFX_VERSION >= MFX_VERSION_NEXT)
         case MFX_FOURCC_P016:
-#endif
         case MFX_FOURCC_P210: {
             for (i = 0; i < ChromaH; i++) {
                 mfxU16* shortPtr =
@@ -1422,8 +1411,6 @@ mfxStatus CSmplYUVWriter::WriteNextFrame(mfxFrameSurface1* pSurface) {
                 if (pInfo.Shift) {
                     // Convert MS-P*1* to P*1* and write
                     // Bits will be shifted to the lower position
-                    tmp.resize(pData.Pitch);
-
                     for (mfxU32 idx = 0; idx < ChromaW; idx++) {
                         tmp[idx] = shortPtr[idx] >> shiftSizeChroma;
                     }
@@ -1516,7 +1503,7 @@ mfxStatus CSmplYUVWriter::WriteNextFrameI420(mfxFrameSurface1* pSurface) {
             break;
         }
         default: {
-            msdk_printf(MSDK_STRING("ERROR: I420 output is accessible only for NV12 and YV12.\n"));
+            printf("ERROR: I420 output is accessible only for NV12 and YV12.\n");
             return MFX_ERR_UNSUPPORTED;
         }
     }
@@ -1622,7 +1609,7 @@ mfxStatus CSmplYUVWriter::WriteNextFrameI420(mfxFrameSurface1* pSurface) {
             break;
         }
         default: {
-            msdk_printf(MSDK_STRING("ERROR: I420 output is accessible only for NV12 and YV12.\n"));
+            printf("ERROR: I420 output is accessible only for NV12 and YV12.\n");
             return MFX_ERR_UNSUPPORTED;
         }
     }
@@ -1641,7 +1628,7 @@ void QPFile::Reader::ResetState(ReaderStatus set_sts) {
     m_FrameVals.clear();
 }
 
-mfxStatus QPFile::Reader::Read(const msdk_string& strFileName, mfxU32 codecid) {
+mfxStatus QPFile::Reader::Read(const std::string& strFileName, mfxU32 codecid) {
     m_ReaderSts   = READER_ERR_NONE;
     m_CurFrameNum = 0;
 
@@ -1650,7 +1637,7 @@ mfxStatus QPFile::Reader::Read(const msdk_string& strFileName, mfxU32 codecid) {
         return MFX_ERR_NOT_INITIALIZED;
     }
 
-    std::ifstream ifs(strFileName, msdk_fstream::in);
+    std::ifstream ifs(strFileName, std::fstream::in);
     if (!ifs.is_open()) {
         ResetState(READER_ERR_FILE_NOT_OPEN);
         return MFX_ERR_NOT_INITIALIZED;
@@ -1710,7 +1697,7 @@ void TCBRCTestFile::Reader::ResetState(ReaderStatus set_sts) {
     m_FrameVals.clear();
 }
 
-mfxStatus TCBRCTestFile::Reader::Read(const msdk_string& strFileName, mfxU32 codecid) {
+mfxStatus TCBRCTestFile::Reader::Read(const std::string& strFileName, mfxU32 codecid) {
     m_ReaderSts   = READER_ERR_NONE;
     m_CurFrameNum = 0;
 
@@ -1719,7 +1706,7 @@ mfxStatus TCBRCTestFile::Reader::Read(const msdk_string& strFileName, mfxU32 cod
         return MFX_ERR_NOT_INITIALIZED;
     }
 
-    std::ifstream ifs(strFileName, msdk_fstream::in);
+    std::ifstream ifs(strFileName, std::fstream::in);
     if (!ifs.is_open()) {
         ResetState(READER_ERR_FILE_NOT_OPEN);
         return MFX_ERR_NOT_INITIALIZED;
@@ -1818,16 +1805,16 @@ mfxU16 GetFreeSurface(mfxFrameSurface1* pSurfacesPool, mfxU16 nPoolSize) {
     } while (t.GetTime() < MSDK_SURFACE_WAIT_INTERVAL / 1000);
 
     if (idx == MSDK_INVALID_SURF_IDX) {
-        msdk_printf(MSDK_STRING("ERROR: No free surfaces in pool (during long period)\n"));
+        printf("ERROR: No free surfaces in pool (during long period)\n");
     }
 
     return idx;
 }
 
-std::basic_string<msdk_char> CodecIdToStr(mfxU32 nFourCC) {
-    std::basic_string<msdk_char> fcc;
+std::string CodecIdToStr(mfxU32 nFourCC) {
+    std::string fcc;
     for (size_t i = 0; i < 4; i++) {
-        fcc.push_back((msdk_char) * (i + (char*)&nFourCC));
+        fcc.push_back((char)*(i + (char*)&nFourCC));
     }
     return fcc;
 }
@@ -1974,81 +1961,79 @@ mfxU16 CalculateDefaultBitrate(mfxU32 nCodecId,
     return (mfxU16)bitrate;
 }
 
-mfxU16 StrToTargetUsage(msdk_string strInput) {
-    std::map<msdk_string, mfxU16> tu;
-    tu[MSDK_STRING("quality")]  = (mfxU16)MFX_TARGETUSAGE_1;
-    tu[MSDK_STRING("veryslow")] = (mfxU16)MFX_TARGETUSAGE_1;
-    tu[MSDK_STRING("slower")]   = (mfxU16)MFX_TARGETUSAGE_2;
-    tu[MSDK_STRING("slow")]     = (mfxU16)MFX_TARGETUSAGE_3;
-    tu[MSDK_STRING("medium")]   = (mfxU16)MFX_TARGETUSAGE_4;
-    tu[MSDK_STRING("balanced")] = (mfxU16)MFX_TARGETUSAGE_4;
-    tu[MSDK_STRING("fast")]     = (mfxU16)MFX_TARGETUSAGE_5;
-    tu[MSDK_STRING("faster")]   = (mfxU16)MFX_TARGETUSAGE_6;
-    tu[MSDK_STRING("veryfast")] = (mfxU16)MFX_TARGETUSAGE_7;
-    tu[MSDK_STRING("speed")]    = (mfxU16)MFX_TARGETUSAGE_7;
-    tu[MSDK_STRING("1")]        = (mfxU16)MFX_TARGETUSAGE_1;
-    tu[MSDK_STRING("2")]        = (mfxU16)MFX_TARGETUSAGE_2;
-    tu[MSDK_STRING("3")]        = (mfxU16)MFX_TARGETUSAGE_3;
-    tu[MSDK_STRING("4")]        = (mfxU16)MFX_TARGETUSAGE_4;
-    tu[MSDK_STRING("5")]        = (mfxU16)MFX_TARGETUSAGE_5;
-    tu[MSDK_STRING("6")]        = (mfxU16)MFX_TARGETUSAGE_6;
-    tu[MSDK_STRING("7")]        = (mfxU16)MFX_TARGETUSAGE_7;
+mfxU16 StrToTargetUsage(std::string strInput) {
+    std::map<std::string, decltype(MFX_TARGETUSAGE_1)> tu{
+        { "quality", MFX_TARGETUSAGE_1 },  { "veryslow", MFX_TARGETUSAGE_1 },
+        { "slower", MFX_TARGETUSAGE_2 },   { "slow", MFX_TARGETUSAGE_3 },
+        { "medium", MFX_TARGETUSAGE_4 },   { "balanced", MFX_TARGETUSAGE_4 },
+        { "fast", MFX_TARGETUSAGE_5 },     { "faster", MFX_TARGETUSAGE_6 },
+        { "veryfast", MFX_TARGETUSAGE_7 }, { "speed", MFX_TARGETUSAGE_7 },
+        { "1", MFX_TARGETUSAGE_1 },        { "2", MFX_TARGETUSAGE_2 },
+        { "3", MFX_TARGETUSAGE_3 },        { "4", MFX_TARGETUSAGE_4 },
+        { "5", MFX_TARGETUSAGE_5 },        { "6", MFX_TARGETUSAGE_6 },
+        { "7", MFX_TARGETUSAGE_7 }
+    };
 
-    if (tu.find(strInput) == tu.end())
+    auto item = tu.find(strInput);
+    if (item == tu.end()) {
         return 0;
-    else
-        return tu[strInput];
-}
-
-const msdk_char* TargetUsageToStr(mfxU16 tu) {
-    switch (tu) {
-        case MFX_TARGETUSAGE_BALANCED:
-            return MSDK_STRING("balanced");
-        case MFX_TARGETUSAGE_BEST_QUALITY:
-            return MSDK_STRING("quality");
-        case MFX_TARGETUSAGE_BEST_SPEED:
-            return MSDK_STRING("speed");
-        case MFX_TARGETUSAGE_UNKNOWN:
-            return MSDK_STRING("unknown");
-        default:
-            return MSDK_STRING("unsupported");
+    }
+    else {
+        return item->second;
     }
 }
 
-const msdk_char* ColorFormatToStr(mfxU32 format) {
+const char* TargetUsageToStr(mfxU16 tu) {
+    switch (tu) {
+        case MFX_TARGETUSAGE_BALANCED:
+            return "balanced";
+        case MFX_TARGETUSAGE_BEST_QUALITY:
+            return "quality";
+        case MFX_TARGETUSAGE_BEST_SPEED:
+            return "speed";
+        case MFX_TARGETUSAGE_UNKNOWN:
+            return "unknown";
+        default:
+            return "unsupported";
+    }
+}
+
+const char* ColorFormatToStr(mfxU32 format) {
     switch (format) {
         case MFX_FOURCC_NV12:
-            return MSDK_STRING("NV12");
+            return "NV12";
         case MFX_FOURCC_YV12:
-            return MSDK_STRING("YV12");
+            return "YV12";
         case MFX_FOURCC_I420:
-            return MSDK_STRING("YUV420");
+            return "YUV420";
         case MFX_FOURCC_I422:
-            return MSDK_STRING("I422");
+            return "I422";
         case MFX_FOURCC_RGB4:
-            return MSDK_STRING("RGB4");
+            return "RGB4";
+        case MFX_FOURCC_BGR4:
+            return "BGR4";
         case MFX_FOURCC_YUY2:
-            return MSDK_STRING("YUY2");
+            return "YUY2";
         case MFX_FOURCC_UYVY:
-            return MSDK_STRING("UYVY");
+            return "UYVY";
         case MFX_FOURCC_I210:
-            return MSDK_STRING("I210");
+            return "I210";
         case MFX_FOURCC_P010:
-            return MSDK_STRING("P010");
+            return "P010";
         case MFX_FOURCC_P210:
-            return MSDK_STRING("P210");
+            return "P210";
         case MFX_FOURCC_Y210:
-            return MSDK_STRING("Y210");
+            return "Y210";
         case MFX_FOURCC_Y410:
-            return MSDK_STRING("Y410");
+            return "Y410";
         case MFX_FOURCC_P016:
-            return MSDK_STRING("P016");
+            return "P016";
         case MFX_FOURCC_Y216:
-            return MSDK_STRING("Y216");
+            return "Y216";
         case MFX_FOURCC_YUV400:
-            return MSDK_STRING("YUV400");
+            return "YUV400";
         default:
-            return MSDK_STRING("unsupported");
+            return "unsupported";
     }
 }
 
@@ -2081,25 +2066,16 @@ mfxU32 GCD(mfxU32 a, mfxU32 b) {
     return b1;
 }
 
-std::basic_string<msdk_char> FormMVCFileName(const msdk_char* strFileNamePattern,
-                                             const mfxU32 numView) {
+std::string FormMVCFileName(const char* strFileNamePattern, const mfxU32 numView) {
     if (NULL == strFileNamePattern)
-        return MSDK_STRING("");
+        return "";
 
-    std::basic_string<msdk_char> mvcFileName, fileExt;
-    msdk_char fileName[MSDK_MAX_FILENAME_LEN];
-#if defined(_WIN32) || defined(_WIN64)
-    msdk_sprintf(fileName,
-                 MSDK_MAX_FILENAME_LEN,
-                 MSDK_STRING("%s_%d.yuv"),
-                 strFileNamePattern,
-                 numView);
-#else
-    msdk_sprintf(fileName, MSDK_STRING("%s_%d.yuv"), strFileNamePattern, numView);
-#endif
-    mvcFileName = fileName;
+    std::string mvcFileName, fileExt;
+    std::stringstream sstr;
+    sstr << strFileNamePattern << "_" << numView << ".yuv";
+    mvcFileName = sstr.str();
 
-    return std::basic_string<msdk_char>(mvcFileName);
+    return std::string(mvcFileName);
 }
 
 // function for getting a pointer to a specific external buffer from the array
@@ -2308,16 +2284,16 @@ void SEICalcSizeType(std::vector<mfxU8>& data, mfxU16 type, mfxU32 size) {
     data.push_back(mfxU8(B));
 }
 
-mfxU8 Char2Hex(msdk_char ch) {
-    msdk_char value = ch;
-    if (value >= MSDK_CHAR('0') && value <= MSDK_CHAR('9')) {
-        value -= MSDK_CHAR('0');
+mfxU8 Char2Hex(char ch) {
+    char value = ch;
+    if (value >= '0' && value <= '9') {
+        value -= '0';
     }
-    else if (value >= MSDK_CHAR('a') && value <= MSDK_CHAR('f')) {
-        value = value - MSDK_CHAR('a') + 10;
+    else if (value >= 'a' && value <= 'f') {
+        value = value - 'a' + 10;
     }
-    else if (value >= MSDK_CHAR('A') && value <= MSDK_CHAR('F')) {
-        value = value - MSDK_CHAR('A') + 10;
+    else if (value >= 'A' && value <= 'F') {
+        value = value - 'A' + 10;
     }
     else {
         value = 0;
@@ -2341,22 +2317,22 @@ bool msdk_trace_is_printable(int level) {
     return g_trace_level >= level;
 }
 
-msdk_ostream& operator<<(msdk_ostream& os, MsdkTraceLevel tl) {
+std::ostream& operator<<(std::ostream& os, MsdkTraceLevel tl) {
     switch (tl) {
         case MSDK_TRACE_LEVEL_CRITICAL:
-            os << MSDK_STRING("CRITICAL");
+            os << "CRITICAL";
             break;
         case MSDK_TRACE_LEVEL_ERROR:
-            os << MSDK_STRING("ERROR");
+            os << "ERROR";
             break;
         case MSDK_TRACE_LEVEL_WARNING:
-            os << MSDK_STRING("WARNING");
+            os << "WARNING";
             break;
         case MSDK_TRACE_LEVEL_INFO:
-            os << MSDK_STRING("INFO");
+            os << "INFO";
             break;
         case MSDK_TRACE_LEVEL_DEBUG:
-            os << MSDK_STRING("DEBUG");
+            os << "DEBUG";
             break;
         default:
             break;
@@ -2364,79 +2340,79 @@ msdk_ostream& operator<<(msdk_ostream& os, MsdkTraceLevel tl) {
     return os;
 }
 
-msdk_string NoFullPath(const msdk_string& file_path) {
-    size_t pos = file_path.find_last_of(MSDK_STRING("\\/"));
-    if (pos != msdk_string::npos) {
+std::string NoFullPath(const std::string& file_path) {
+    size_t pos = file_path.find_last_of("\\/");
+    if (pos != std::string::npos) {
         return file_path.substr(pos + 1);
     }
     return file_path;
 }
 
 template <>
-mfxStatus msdk_opt_read(const msdk_char* string, mfxU8& value) {
-    msdk_char* stopCharacter;
-    value = (mfxU8)msdk_strtol(string, &stopCharacter, 10);
+mfxStatus msdk_opt_read(const char* string, mfxU8& value) {
+    char* stopCharacter;
+    value = (mfxU8)strtol(string, &stopCharacter, 10);
 
-    return (msdk_strlen(stopCharacter) == 0) ? MFX_ERR_NONE : MFX_ERR_UNKNOWN;
+    return (strlen(stopCharacter) == 0) ? MFX_ERR_NONE : MFX_ERR_UNKNOWN;
 }
 
 template <>
-mfxStatus msdk_opt_read(const msdk_char* string, mfxU16& value) {
-    msdk_char* stopCharacter;
-    value = (mfxU16)msdk_strtol(string, &stopCharacter, 10);
+mfxStatus msdk_opt_read(const char* string, mfxU16& value) {
+    char* stopCharacter;
+    value = (mfxU16)strtol(string, &stopCharacter, 10);
 
-    return (msdk_strlen(stopCharacter) == 0) ? MFX_ERR_NONE : MFX_ERR_UNKNOWN;
+    return (strlen(stopCharacter) == 0) ? MFX_ERR_NONE : MFX_ERR_UNKNOWN;
 }
 
 template <>
-mfxStatus msdk_opt_read(const msdk_char* string, mfxU32& value) {
-    msdk_char* stopCharacter;
-    value = (mfxU32)msdk_strtol(string, &stopCharacter, 10);
+mfxStatus msdk_opt_read(const char* string, mfxU32& value) {
+    char* stopCharacter;
+    value = (mfxU32)strtol(string, &stopCharacter, 10);
 
-    return (msdk_strlen(stopCharacter) == 0) ? MFX_ERR_NONE : MFX_ERR_UNKNOWN;
+    return (strlen(stopCharacter) == 0) ? MFX_ERR_NONE : MFX_ERR_UNKNOWN;
 }
 
 template <>
-mfxStatus msdk_opt_read(const msdk_char* string, mfxF32& value) {
-    msdk_char* stopCharacter;
-    value = (mfxF32)msdk_strtod(string, &stopCharacter);
-    return (msdk_strlen(stopCharacter) == 0) ? MFX_ERR_NONE : MFX_ERR_UNKNOWN;
+mfxStatus msdk_opt_read(const char* string, mfxF32& value) {
+    char* stopCharacter;
+    value = (mfxF32)strtod(string, &stopCharacter);
+    return (strlen(stopCharacter) == 0) ? MFX_ERR_NONE : MFX_ERR_UNKNOWN;
 }
 template <>
-mfxStatus msdk_opt_read(const msdk_char* string, mfxF64& value) {
-    msdk_char* stopCharacter;
-    value = (mfxF64)msdk_strtod(string, &stopCharacter);
+mfxStatus msdk_opt_read(const char* string, mfxF64& value) {
+    char* stopCharacter;
+    value = (mfxF64)strtod(string, &stopCharacter);
 
-    return (msdk_strlen(stopCharacter) == 0) ? MFX_ERR_NONE : MFX_ERR_UNKNOWN;
+    return (strlen(stopCharacter) == 0) ? MFX_ERR_NONE : MFX_ERR_UNKNOWN;
 }
 
-mfxStatus msdk_opt_read(const msdk_char* string, mfxU8& value);
-mfxStatus msdk_opt_read(const msdk_char* string, mfxU16& value);
-mfxStatus msdk_opt_read(const msdk_char* string, mfxU32& value);
-mfxStatus msdk_opt_read(const msdk_char* string, mfxF64& value);
-mfxStatus msdk_opt_read(const msdk_char* string, mfxF32& value);
+mfxStatus msdk_opt_read(const char* string, mfxU8& value);
+mfxStatus msdk_opt_read(const char* string, mfxU16& value);
+mfxStatus msdk_opt_read(const char* string, mfxU32& value);
+mfxStatus msdk_opt_read(const char* string, mfxF64& value);
+mfxStatus msdk_opt_read(const char* string, mfxF32& value);
 
 template <>
-mfxStatus msdk_opt_read(const msdk_char* string, mfxI16& value) {
-    msdk_char* stopCharacter;
-    value = (mfxI16)msdk_strtol(string, &stopCharacter, 10);
+mfxStatus msdk_opt_read(const char* string, mfxI16& value) {
+    char* stopCharacter;
+    value = (mfxI16)strtol(string, &stopCharacter, 10);
 
-    return (msdk_strlen(stopCharacter) == 0) ? MFX_ERR_NONE : MFX_ERR_UNKNOWN;
+    return (strlen(stopCharacter) == 0) ? MFX_ERR_NONE : MFX_ERR_UNKNOWN;
 }
 
 template <>
-mfxStatus msdk_opt_read(const msdk_char* string, mfxI32& value) {
-    msdk_char* stopCharacter;
-    value = (mfxI32)msdk_strtol(string, &stopCharacter, 10);
+mfxStatus msdk_opt_read(const char* string, mfxI32& value) {
+    char* stopCharacter;
+    value = (mfxI32)strtol(string, &stopCharacter, 10);
 
-    return (msdk_strlen(stopCharacter) == 0) ? MFX_ERR_NONE : MFX_ERR_UNKNOWN;
+    return (strlen(stopCharacter) == 0) ? MFX_ERR_NONE : MFX_ERR_UNKNOWN;
 }
 
-mfxStatus msdk_opt_read(const msdk_char* string, mfxI16& value);
-mfxStatus msdk_opt_read(const msdk_char* string, mfxI32& value);
+mfxStatus msdk_opt_read(const char* string, mfxI16& value);
+mfxStatus msdk_opt_read(const char* string, mfxI32& value);
 
 template <>
-mfxStatus msdk_opt_read(const msdk_char* string, mfxPriority& value) {
+mfxStatus msdk_opt_read(const char* string, mfxPriority& value) {
     mfxU32 priority = 0;
     mfxStatus sts   = msdk_opt_read<>(string, priority);
 
@@ -2445,7 +2421,21 @@ mfxStatus msdk_opt_read(const msdk_char* string, mfxPriority& value) {
     return sts;
 }
 
-mfxStatus msdk_opt_read(msdk_char* string, mfxPriority& value);
+template <>
+mfxStatus msdk_opt_read(const char* string, std::string& value) {
+    std::string temp_value = std::string(string);
+    value                  = std::string(temp_value.begin(), temp_value.end());
+    return MFX_ERR_NONE;
+}
+
+template <>
+mfxStatus msdk_opt_read(const char* string, std::wstring& value) {
+    std::string temp_value = std::string(string);
+    value                  = std::wstring(temp_value.begin(), temp_value.end());
+    return MFX_ERR_NONE;
+}
+
+mfxStatus msdk_opt_read(char* string, mfxPriority& value);
 
 bool IsDecodeCodecSupported(mfxU32 codecFormat) {
     switch (codecFormat) {
@@ -2497,7 +2487,7 @@ bool IsPluginCodecSupported(mfxU32 codecFormat) {
     return true;
 }
 
-mfxStatus StrFormatToCodecFormatFourCC(msdk_char* strInput, mfxU32& codecFormat) {
+mfxStatus StrFormatToCodecFormatFourCC(char* strInput, mfxU32& codecFormat) {
     mfxStatus sts = MFX_ERR_NONE;
     codecFormat   = 0;
 
@@ -2505,50 +2495,56 @@ mfxStatus StrFormatToCodecFormatFourCC(msdk_char* strInput, mfxU32& codecFormat)
         sts = MFX_ERR_NULL_PTR;
 
     if (sts == MFX_ERR_NONE) {
-        if (0 == msdk_strcmp(strInput, MSDK_STRING("mpeg2"))) {
+        if (msdk_match(strInput, "mpeg2")) {
             codecFormat = MFX_CODEC_MPEG2;
         }
-        else if (0 == msdk_strcmp(strInput, MSDK_STRING("h264"))) {
+        else if (msdk_match(strInput, "h264")) {
             codecFormat = MFX_CODEC_AVC;
         }
-        else if (0 == msdk_strcmp(strInput, MSDK_STRING("h265"))) {
+        else if (msdk_match(strInput, "h265")) {
             codecFormat = MFX_CODEC_HEVC;
         }
-        else if (0 == msdk_strcmp(strInput, MSDK_STRING("vc1"))) {
+        else if (msdk_match(strInput, "vc1")) {
             codecFormat = MFX_CODEC_VC1;
         }
-        else if (0 == msdk_strcmp(strInput, MSDK_STRING("mvc"))) {
+        else if (msdk_match(strInput, "mvc")) {
             codecFormat = CODEC_MVC;
         }
-        else if (0 == msdk_strcmp(strInput, MSDK_STRING("jpeg"))) {
+        else if (msdk_match(strInput, "jpeg")) {
             codecFormat = MFX_CODEC_JPEG;
         }
-        else if (0 == msdk_strcmp(strInput, MSDK_STRING("vp8"))) {
+        else if (msdk_match(strInput, "vp8")) {
             codecFormat = MFX_CODEC_VP8;
         }
-        else if (0 == msdk_strcmp(strInput, MSDK_STRING("vp9"))) {
+        else if (msdk_match(strInput, "vp9")) {
             codecFormat = MFX_CODEC_VP9;
         }
-        else if (0 == msdk_strcmp(strInput, MSDK_STRING("av1"))) {
+        else if (msdk_match(strInput, "av1")) {
             codecFormat = MFX_CODEC_AV1;
         }
-        else if ((0 == msdk_strcmp(strInput, MSDK_STRING("raw")))) {
+        else if ((msdk_match(strInput, "raw"))) {
             codecFormat = MFX_CODEC_DUMP;
         }
-        else if ((0 == msdk_strcmp(strInput, MSDK_STRING("rgb4_frame")))) {
+        else if ((msdk_match(strInput, "rgb4_frame"))) {
             codecFormat = MFX_CODEC_RGB4;
         }
-        else if ((0 == msdk_strcmp(strInput, MSDK_STRING("nv12")))) {
+        else if ((msdk_match(strInput, "nv12"))) {
             codecFormat = MFX_CODEC_NV12;
         }
-        else if ((0 == msdk_strcmp(strInput, MSDK_STRING("i420")))) {
+        else if ((msdk_match(strInput, "i420"))) {
             codecFormat = MFX_CODEC_I420;
         }
-        else if ((0 == msdk_strcmp(strInput, MSDK_STRING("i422")))) {
+        else if ((msdk_match(strInput, "i422"))) {
             codecFormat = MFX_CODEC_I422;
         }
-        else if ((0 == msdk_strcmp(strInput, MSDK_STRING("p010")))) {
+        else if ((msdk_match(strInput, "p010"))) {
             codecFormat = MFX_CODEC_P010;
+        }
+        else if ((msdk_match(strInput, "yuy2"))) {
+            codecFormat = MFX_CODEC_YUY2;
+        }
+        else if ((msdk_match(strInput, "y210"))) {
+            codecFormat = MFX_CODEC_Y210;
         }
         else
             sts = MFX_ERR_UNSUPPORTED;
@@ -2557,83 +2553,83 @@ mfxStatus StrFormatToCodecFormatFourCC(msdk_char* strInput, mfxU32& codecFormat)
     return sts;
 }
 
-msdk_string StatusToString(mfxStatus sts) {
+const char* StatusToString(mfxStatus sts) {
     switch (sts) {
         case MFX_ERR_NONE:
-            return msdk_string(MSDK_STRING("MFX_ERR_NONE"));
+            return "MFX_ERR_NONE";
         case MFX_ERR_UNKNOWN:
-            return msdk_string(MSDK_STRING("MFX_ERR_UNKNOWN"));
+            return "MFX_ERR_UNKNOWN";
         case MFX_ERR_NULL_PTR:
-            return msdk_string(MSDK_STRING("MFX_ERR_NULL_PTR"));
+            return "MFX_ERR_NULL_PTR";
         case MFX_ERR_UNSUPPORTED:
-            return msdk_string(MSDK_STRING("MFX_ERR_UNSUPPORTED"));
+            return "MFX_ERR_UNSUPPORTED";
         case MFX_ERR_MEMORY_ALLOC:
-            return msdk_string(MSDK_STRING("MFX_ERR_MEMORY_ALLOC"));
+            return "MFX_ERR_MEMORY_ALLOC";
         case MFX_ERR_NOT_ENOUGH_BUFFER:
-            return msdk_string(MSDK_STRING("MFX_ERR_NOT_ENOUGH_BUFFER"));
+            return "MFX_ERR_NOT_ENOUGH_BUFFER";
         case MFX_ERR_INVALID_HANDLE:
-            return msdk_string(MSDK_STRING("MFX_ERR_INVALID_HANDLE"));
+            return "MFX_ERR_INVALID_HANDLE";
         case MFX_ERR_LOCK_MEMORY:
-            return msdk_string(MSDK_STRING("MFX_ERR_LOCK_MEMORY"));
+            return "MFX_ERR_LOCK_MEMORY";
         case MFX_ERR_NOT_INITIALIZED:
-            return msdk_string(MSDK_STRING("MFX_ERR_NOT_INITIALIZED"));
+            return "MFX_ERR_NOT_INITIALIZED";
         case MFX_ERR_NOT_FOUND:
-            return msdk_string(MSDK_STRING("MFX_ERR_NOT_FOUND"));
+            return "MFX_ERR_NOT_FOUND";
         case MFX_ERR_MORE_DATA:
-            return msdk_string(MSDK_STRING("MFX_ERR_MORE_DATA"));
+            return "MFX_ERR_MORE_DATA";
         case MFX_ERR_MORE_SURFACE:
-            return msdk_string(MSDK_STRING("MFX_ERR_MORE_SURFACE"));
+            return "MFX_ERR_MORE_SURFACE";
         case MFX_ERR_ABORTED:
-            return msdk_string(MSDK_STRING("MFX_ERR_ABORTED"));
+            return "MFX_ERR_ABORTED";
         case MFX_ERR_DEVICE_LOST:
-            return msdk_string(MSDK_STRING("MFX_ERR_DEVICE_LOST"));
+            return "MFX_ERR_DEVICE_LOST";
         case MFX_ERR_INCOMPATIBLE_VIDEO_PARAM:
-            return msdk_string(MSDK_STRING("MFX_ERR_INCOMPATIBLE_VIDEO_PARAM"));
+            return "MFX_ERR_INCOMPATIBLE_VIDEO_PARAM";
         case MFX_ERR_INVALID_VIDEO_PARAM:
-            return msdk_string(MSDK_STRING("MFX_ERR_INVALID_VIDEO_PARAM"));
+            return "MFX_ERR_INVALID_VIDEO_PARAM";
         case MFX_ERR_UNDEFINED_BEHAVIOR:
-            return msdk_string(MSDK_STRING("MFX_ERR_UNDEFINED_BEHAVIOR"));
+            return "MFX_ERR_UNDEFINED_BEHAVIOR";
         case MFX_ERR_DEVICE_FAILED:
-            return msdk_string(MSDK_STRING("MFX_ERR_DEVICE_FAILED"));
+            return "MFX_ERR_DEVICE_FAILED";
         case MFX_ERR_MORE_BITSTREAM:
-            return msdk_string(MSDK_STRING("MFX_ERR_MORE_BITSTREAM"));
+            return "MFX_ERR_MORE_BITSTREAM";
         case MFX_ERR_GPU_HANG:
-            return msdk_string(MSDK_STRING("MFX_ERR_GPU_HANG"));
+            return "MFX_ERR_GPU_HANG";
         case MFX_ERR_REALLOC_SURFACE:
-            return msdk_string(MSDK_STRING("MFX_ERR_REALLOC_SURFACE"));
+            return "MFX_ERR_REALLOC_SURFACE";
         case MFX_WRN_IN_EXECUTION:
-            return msdk_string(MSDK_STRING("MFX_WRN_IN_EXECUTION"));
+            return "MFX_WRN_IN_EXECUTION";
         case MFX_WRN_DEVICE_BUSY:
-            return msdk_string(MSDK_STRING("MFX_WRN_DEVICE_BUSY"));
+            return "MFX_WRN_DEVICE_BUSY";
         case MFX_WRN_VIDEO_PARAM_CHANGED:
-            return msdk_string(MSDK_STRING("MFX_WRN_VIDEO_PARAM_CHANGED"));
+            return "MFX_WRN_VIDEO_PARAM_CHANGED";
         case MFX_WRN_PARTIAL_ACCELERATION:
-            return msdk_string(MSDK_STRING("MFX_WRN_PARTIAL_ACCELERATION"));
+            return "MFX_WRN_PARTIAL_ACCELERATION";
         case MFX_WRN_INCOMPATIBLE_VIDEO_PARAM:
-            return msdk_string(MSDK_STRING("MFX_WRN_INCOMPATIBLE_VIDEO_PARAM"));
+            return "MFX_WRN_INCOMPATIBLE_VIDEO_PARAM";
         case MFX_WRN_VALUE_NOT_CHANGED:
-            return msdk_string(MSDK_STRING("MFX_WRN_VALUE_NOT_CHANGED"));
+            return "MFX_WRN_VALUE_NOT_CHANGED";
         case MFX_WRN_OUT_OF_RANGE:
-            return msdk_string(MSDK_STRING("MFX_WRN_OUT_OF_RANGE"));
+            return "MFX_WRN_OUT_OF_RANGE";
         case MFX_WRN_FILTER_SKIPPED:
-            return msdk_string(MSDK_STRING("MFX_WRN_FILTER_SKIPPED"));
+            return "MFX_WRN_FILTER_SKIPPED";
         case MFX_TASK_WORKING:
-            return msdk_string(MSDK_STRING("MFX_TASK_WORKING"));
+            return "MFX_TASK_WORKING";
         case MFX_TASK_BUSY:
-            return msdk_string(MSDK_STRING("MFX_TASK_BUSY"));
+            return "MFX_TASK_BUSY";
         case MFX_ERR_MORE_DATA_SUBMIT_TASK:
-            return msdk_string(MSDK_STRING("MFX_ERR_MORE_DATA_SUBMIT_TASK"));
+            return "MFX_ERR_MORE_DATA_SUBMIT_TASK";
         default:
-            return msdk_string(MSDK_STRING("[Unknown status]"));
+            return "[Unknown status]";
     }
 }
 
-mfxI32 getMonitorType(msdk_char* str) {
+mfxI32 getMonitorType(char* str) {
     struct {
-        const msdk_char* str;
+        const char* str;
         mfxI32 mfx_type;
     } table[] = {
-#define __DECLARE(type) { MSDK_STRING(#type), MFX_MONITOR_##type }
+#define __DECLARE(type) { #type, MFX_MONITOR_##type }
         __DECLARE(Unknown),
         __DECLARE(VGA),
         __DECLARE(DVII),
@@ -2658,7 +2654,7 @@ mfxI32 getMonitorType(msdk_char* str) {
 #undef __DECLARE
     };
     for (unsigned int i = 0; i < sizeof(table) / sizeof(table[0]); ++i) {
-        if (0 == msdk_strcmp(str, table[i].str)) {
+        if (msdk_match(str, table[i].str)) {
             return table[i].mfx_type;
         }
     }
@@ -2688,7 +2684,7 @@ void CH264FrameReader::Close() {
     }
 }
 
-mfxStatus CH264FrameReader::Init(const msdk_char* strFileName) {
+mfxStatus CH264FrameReader::Init(const char* strFileName) {
     mfxStatus sts = MFX_ERR_NONE;
 
     sts = CSmplBitstreamReader::Init(strFileName);
@@ -2837,6 +2833,7 @@ mfxU16 FourCCToChroma(mfxU32 fourCC) {
         case MFX_FOURCC_A2RGB10:
         case MFX_FOURCC_AYUV:
         case MFX_FOURCC_RGB4:
+        case MFX_FOURCC_BGR4:
             return MFX_CHROMAFORMAT_YUV444;
     }
 
@@ -2869,21 +2866,19 @@ mfxStatus PrintLoadedModules() {
 
     const DWORD MAX_FILE_PATH = 1024;
     for (auto module : modules) {
-        TCHAR moduleName[MAX_PATH];
+        char moduleName[MAX_PATH];
         if (GetModuleBaseName(hProcess, module, moduleName, MAX_PATH)) {
-            if (_tcsstr(moduleName, _T(LIBMFXHW_MASK)) != NULL ||
-                _tcsstr(moduleName, _T(LIBMFXSW_MASK)) != NULL ||
-                _tcsstr(moduleName, _T(ONEVPL32)) != NULL ||
-                _tcsstr(moduleName, _T(ONEVPL64)) != NULL ||
-                _tcsstr(moduleName, _T(ONEVPLSW_MASK)) != NULL) {
-                TCHAR modulePath[MAX_FILE_PATH];
+            if (strstr(moduleName, LIBMFXHW_MASK) != NULL ||
+                strstr(moduleName, LIBMFXSW_MASK) != NULL || strstr(moduleName, ONEVPL32) != NULL ||
+                strstr(moduleName, ONEVPL64) != NULL || strstr(moduleName, ONEVPLSW_MASK) != NULL) {
+                char modulePath[MAX_FILE_PATH];
                 DWORD charsReturned = GetModuleFileName(module, modulePath, MAX_FILE_PATH);
                 // path can be bigger than MAX_FILE_PATH, in this case it will be truncated
                 // so, print whole or truncated part of path and, if we get truncated path, print module name too
                 if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
-                    msdk_printf(MSDK_STRING("Loaded module name: %s ; "), moduleName);
+                    printf("Loaded module name: %s ; ", moduleName);
                 }
-                msdk_printf(MSDK_STRING("Loaded module path: %s \n"), modulePath);
+                printf("Loaded module path: %s \n", modulePath);
             }
         }
     }
@@ -2900,14 +2895,85 @@ int PrintLibMFXPath(struct dl_phdr_info* info, size_t size, void* data) {
         libPath.find(ONEVPLSW_MASK) != std::string::npos ||
         libPath.find(ONEVPLHW_MASK) != std::string::npos) {
         if (data) {
-            msdk_printf(MSDK_STRING("   %d: %s \n"), *((int*)data), info->dlpi_name);
+            printf("   %d: %s \n", *((int*)data), info->dlpi_name);
             *(int*)data += 1;
         }
         else {
-            msdk_printf(MSDK_STRING("Loaded module: %s \n"), info->dlpi_name);
+            printf("Loaded module: %s \n", info->dlpi_name);
         }
     }
     return 0;
 }
 
 #endif // #if defined(_WIN32) || defined(_WIN64)
+
+#ifdef ONEVPL_EXPERIMENTAL
+
+mfxStatus SetParameter(mfxConfigInterface* config_interface,
+                       MfxVideoParamsWrapper& par,
+                       const std::string& param) {
+    if (param.empty()) {
+        return MFX_ERR_NONE;
+    }
+    mfxStatus sts;
+    mfxExtBuffer ext_buf;
+    std::string param_delim("=");
+    size_t delim_pos = param.find(param_delim);
+    if (delim_pos == std::string::npos) {
+        return MFX_ERR_INVALID_VIDEO_PARAM;
+    }
+    std::string name  = param.substr(0, delim_pos);
+    std::string value = param.substr(delim_pos + param_delim.length());
+    // printf("Set param: %s = %s\n", name.c_str(), value.c_str());
+    sts = config_interface->SetParameter(config_interface,
+                                         (const mfxU8*)name.c_str(),
+                                         (const mfxU8*)value.c_str(),
+                                         MFX_STRUCTURE_TYPE_VIDEO_PARAM,
+                                         &par,
+                                         &ext_buf);
+    if (sts == MFX_ERR_MORE_EXTBUFFER) {
+        // printf("Adding Ext Buffer: %x\n", ext_buf.BufferId);
+        par.AddExtBuffer(ext_buf.BufferId, ext_buf.BufferSz);
+        // printf("Set Ext Buffer: %s = %s\n", name.c_str(), value.c_str());
+        sts = config_interface->SetParameter(config_interface,
+                                             (const mfxU8*)name.c_str(),
+                                             (const mfxU8*)value.c_str(),
+                                             MFX_STRUCTURE_TYPE_VIDEO_PARAM,
+                                             &par,
+                                             &ext_buf);
+    }
+    return sts;
+}
+
+mfxStatus SetParameters(mfxSession session, MfxVideoParamsWrapper& par, const std::string& params) {
+    mfxConfigInterface* config_interface = nullptr;
+    mfxStatus sts;
+    std::string params_str(params.begin(), params.end());
+    std::string params_delim(":");
+    sts = MFXGetConfigInterface(session, &config_interface);
+    if (sts != MFX_ERR_NONE) {
+        // printf("!! %d\n", sts);
+        return sts;
+    }
+
+    size_t pos       = 0;
+    size_t delim_pos = params_str.find(params_delim, pos);
+    // SetParameter treats an empty string as a valid no-op so we don't have to detect it here.
+    while (delim_pos != std::string::npos) {
+        size_t delim = delim_pos - pos;
+        // std::cout << pos << ", " << delim_pos << " : " << params_str.substr(pos, delim)
+        //           << std::endl;
+        sts = SetParameter(config_interface, par, params_str.substr(pos, delim));
+        if (sts != MFX_ERR_NONE) {
+            return sts;
+        }
+        pos       = pos + delim + params_delim.length();
+        delim_pos = params_str.find(params_delim, pos);
+    }
+    if (pos < params_str.length()) {
+        sts = SetParameter(config_interface, par, params_str.substr(pos));
+    }
+    return sts;
+}
+
+#endif // ONEVPL_EXPERIMENTAL

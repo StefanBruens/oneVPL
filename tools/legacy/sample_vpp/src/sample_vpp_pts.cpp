@@ -30,7 +30,8 @@ PTSMaker::PTSMaker()
           m_NumFrame_In(0),
           m_NumFrame_Out(0),
           m_IsJump(false),
-          m_bIsAdvancedMode(false) {}
+          m_bIsAdvancedMode(false),
+          m_ptsList() {}
 
 mfxStatus PTSMaker::Init(mfxVideoParam* par,
                          mfxU32 asyncDeep,
@@ -174,11 +175,11 @@ void PTSMaker::JumpPTS() {
 }
 
 void PTSMaker::PrintDumpInfo() {
-    msdk_printf(MSDK_STRING("Error in PTS setting \n"));
-    msdk_printf(MSDK_STRING("Input frame number is %d\n"), m_NumFrame_In);
-    msdk_printf(MSDK_STRING("Output frame number is %d\n"), m_NumFrame_Out);
-    msdk_printf(MSDK_STRING("Initial time offset is %f\n"), m_TimeOffset);
-    msdk_printf(MSDK_STRING("PTS difference is %f\n"), m_CurrDiff);
+    printf("Error in PTS setting \n");
+    printf("Input frame number is %d\n", m_NumFrame_In);
+    printf("Output frame number is %d\n", m_NumFrame_Out);
+    printf("Initial time offset is %f\n", m_TimeOffset);
+    printf("PTS difference is %f\n", m_CurrDiff);
 }
 
 /***************************************************************************/

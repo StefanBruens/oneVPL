@@ -13,6 +13,8 @@
 #include <condition_variable>
 #include <ctime>
 #include <future>
+#include <iomanip>
+#include <iostream>
 #include <list>
 #include <map>
 #include <memory>
@@ -29,17 +31,17 @@
 #include "brc_routines.h"
 #include "hw_device.h"
 #include "mfxdeprecated.h"
-#include "mfxjpeg.h"
-#include "mfxmvc.h"
 #include "mfxplugin.h"
-#include "mfxvp8.h"
 #include "plugin_utils.h"
 #include "preset_manager.h"
 #include "sample_defs.h"
 #include "smt_tracer.h"
 #include "vpl/mfxdispatcher.h"
+#include "vpl/mfxjpeg.h"
+#include "vpl/mfxmvc.h"
 #include "vpl/mfxvideo++.h"
 #include "vpl/mfxvideo.h"
+#include "vpl/mfxvp8.h"
 
 #define TIME_STATS 1 // Enable statistics processing
 #include "time_statistics.h"
@@ -48,13 +50,7 @@
     #include "decode_render.h"
 #endif
 
-#if defined(_WIN32) || defined(_WIN64)
-    #define MSDK_CPU_ROTATE_PLUGIN MSDK_STRING("sample_rotate_plugin.dll")
-    #define MSDK_OCL_ROTATE_PLUGIN MSDK_STRING("sample_plugin_opencl.dll")
-#else
-    #define MSDK_CPU_ROTATE_PLUGIN MSDK_STRING("libsample_rotate_plugin.so")
-    #define MSDK_OCL_ROTATE_PLUGIN MSDK_STRING("libsample_plugin_opencl.so")
-#endif
+#include "smt_cli_params.h"
 
 #define MAX_PREF_LEN 256
 
@@ -68,392 +64,16 @@ const mfxF64 MCTF_LOSSLESS_BPP        = 0.0;
 #endif
 
 namespace TranscodingSample {
-enum PipelineMode {
-    Native =
-        0, // means that pipeline is based depends on the cmd parameters (decode/encode/transcode)
-    Sink, // means that pipeline makes decode only and put data to shared buffer
-    Source, // means that pipeline makes vpp + encode and get data from shared buffer
-    VppComp, // means that pipeline makes vpp composition + encode and get data from shared buffer
-    VppCompOnly, // means that pipeline makes vpp composition and get data from shared buffer
-    VppCompOnlyEncode // means that pipeline makes vpp composition + encode and get data from shared buffer
-};
+
+enum ProlongStatus { NormalFrame = 0x5F, BlackFrame = 0xBF, AllBlack = 0xAB };
 
 enum VppCompDumpMode { NULL_RENDER_VPP_COMP = 1, DUMP_FILE_VPP_COMP = 2 };
-
-enum EFieldCopyMode { FC_NONE = 0, FC_T2T = 1, FC_T2B = 2, FC_B2T = 4, FC_B2B = 8, FC_FR2FR = 16 };
-
-struct sVppCompDstRect {
-    mfxU32 DstX;
-    mfxU32 DstY;
-    mfxU32 DstW;
-    mfxU32 DstH;
-    mfxU16 TileId;
-};
-
-#ifdef ENABLE_MCTF
-typedef enum {
-    VPP_FILTER_DISABLED           = 0,
-    VPP_FILTER_ENABLED_DEFAULT    = 1,
-    VPP_FILTER_ENABLED_CONFIGURED = 7
-
-} VPPFilterMode;
-
-// this is a structure with mctf-parameteres
-// that can be changed in run-time;
-struct sMctfRunTimeParam {
-    #ifdef ENABLE_MCTF_EXT
-        #if 0
-        mfxU32 BitsPerPixelx100k;
-        mfxU16 Deblock;
-        #endif
-    #endif
-    mfxU16 FilterStrength;
-};
-
-struct sMctfRunTimeParams {
-    sMctfRunTimeParams() : CurIdx(0), RunTimeParams() {}
-
-    mfxU32 CurIdx;
-    std::vector<sMctfRunTimeParam> RunTimeParams;
-    // returns rt-param corresponding to CurIdx or NULL if
-    // CurIdx is behind available info
-    const sMctfRunTimeParam* GetCurParam();
-    // move CurIdx forward
-    void MoveForward();
-    // set CurIdx to the begining; restart indexing;
-    void Restart();
-    // reset vector & index
-    void Reset();
-    // test for emptiness
-    bool Empty() {
-        return RunTimeParams.empty();
-    };
-};
-
-struct sMCTFParam {
-    sMctfRunTimeParams rtParams;
-    mfxExtVppMctf params;
-    VPPFilterMode mode;
-};
-#endif
-
-enum ExtBRCType { EXTBRC_DEFAULT, EXTBRC_OFF, EXTBRC_ON, EXTBRC_IMPLICIT };
 
 enum MemoryModel {
     UNKNOWN_ALLOC     = 0, // GENERAL_ALLOC will be used by default
     GENERAL_ALLOC     = 1,
     VISIBLE_INT_ALLOC = 2,
     HIDDEN_INT_ALLOC  = 3
-};
-
-// the default api version is the latest one
-// it is located at 0
-enum eAPIVersion { API_2X, API_1X };
-
-typedef struct {
-    mfxU16 InsertPayloadToggle;
-    mfxU16 DisplayPrimariesX[3];
-    mfxU16 DisplayPrimariesY[3];
-    mfxU16 WhitePointX;
-    mfxU16 WhitePointY;
-    mfxU32 MaxDisplayMasteringLuminance;
-    mfxU32 MinDisplayMasteringLuminance;
-} sSEIMetaMasteringDisplay;
-
-typedef struct {
-    mfxU16 InsertPayloadToggle;
-    mfxU16 MaxContentLightLevel;
-    mfxU16 MaxPicAverageLightLevel;
-} sSEIMetaContentLightLevel;
-typedef struct {
-    bool Enabled;
-    mfxU16 VideoFullRange;
-    mfxU16 ColourPrimaries;
-} sVideoSignalInfo;
-
-struct __sInputParams {
-    mfxU32 TargetID                    = 0;
-    bool CascadeScaler                 = false;
-    bool EnableTracing                 = false;
-    mfxU32 TraceBufferSize             = 0;
-    SMTTracer::LatencyType LatencyType = SMTTracer::LatencyType::DEFAULT;
-    bool ParallelEncoding              = false;
-
-    // session parameters
-    bool bIsJoin;
-    mfxPriority priority;
-    // common parameters
-    mfxIMPL libType; // Type of used mediaSDK library
-#if defined(LINUX32) || defined(LINUX64)
-    std::string strDevicePath;
-#endif
-// Extended device ID info, available in 2.6 and newer APIs
-#if (defined(_WIN64) || defined(_WIN32))
-    LUID luid;
-#else
-    mfxU32 DRMRenderNodeNum = 0;
-#endif
-    mfxU32 PCIDomain    = 0;
-    mfxU32 PCIBus       = 0;
-    mfxU32 PCIDevice    = 0;
-    mfxU32 PCIFunction  = 0;
-    bool PCIDeviceSetup = false;
-
-#if (defined(_WIN64) || defined(_WIN32))
-    bool isDualMode;
-    mfxHyperMode hyperMode;
-#endif
-#if (defined(_WIN32) || defined(_WIN64))
-    //Adapter type
-    bool bPreferiGfx;
-    bool bPreferdGfx;
-#endif
-
-    mfxU16 nIdrInterval;
-
-    //Adapter type
-    mfxU16 adapterType = mfxMediaAdapterType::MFX_MEDIA_UNKNOWN;
-    mfxI32 dGfxIdx     = -1;
-    mfxI32 adapterNum  = -1;
-
-    bool dispFullSearch = DEF_DISP_FULLSEARCH;
-
-    mfxU16 nThreadsNum; // number of internal session threads number
-    bool bRobustFlag; // Robust transcoding mode. Allows auto-recovery after hardware errors
-    bool bSoftRobustFlag;
-
-    mfxU32 EncodeId; // type of output coded video
-    mfxU32 DecodeId; // type of input coded video
-
-    msdk_char strSrcFile[MSDK_MAX_FILENAME_LEN]; // source bitstream file
-    msdk_char strDstFile[MSDK_MAX_FILENAME_LEN]; // destination bitstream file
-    msdk_char strDumpVppCompFile[MSDK_MAX_FILENAME_LEN]; // VPP composition output dump file
-    msdk_char strMfxParamsDumpFile[MSDK_MAX_FILENAME_LEN];
-
-    msdk_char strTCBRCFilePath[MSDK_MAX_FILENAME_LEN];
-
-    // specific encode parameters
-    mfxU16 nTargetUsage;
-    mfxF64 dDecoderFrameRateOverride;
-    mfxF64 dEncoderFrameRateOverride;
-    mfxU16 EncoderPicstructOverride;
-    mfxF64 dVPPOutFramerate;
-    mfxU32 nBitRate;
-    mfxU16 nBitRateMultiplier;
-    mfxU16 nQuality; // quality parameter for JPEG encoder
-    mfxU16 nDstWidth; // destination picture width, specified if resizing required
-    mfxU16 nDstHeight; // destination picture height, specified if resizing required
-
-    mfxU16 nEncTileRows; // number of rows for encoding tiling
-    mfxU16 nEncTileCols; // number of columns for encoding tiling
-
-    bool
-        bEmbeddedDenoiser; // enable or disable embeded HVS Denoiser (HVS denoiser is integrated into encoder)
-    mfxU16
-        EmbeddedDenoiseMode; // embeded HVS Denoiser Mode (HVS denoiser is integrated into encoder)
-    int EmbeddedDenoiseLevel; // embeded HVS Denoiser Level (HVS denoiser is integrated into encoder)
-
-    bool bEnableDeinterlacing;
-    mfxU16 DeinterlacingMode;
-    bool bVppDenoiser;
-    int VppDenoiseLevel;
-    mfxU16 VppDenoiseMode;
-    int DetailLevel;
-    mfxU16 FRCAlgorithm;
-    EFieldCopyMode fieldProcessingMode;
-    mfxU16 ScalingMode;
-
-    mfxU16 nAsyncDepth; // asyncronous queue
-
-    PipelineMode eMode;
-    PipelineMode eModeExt;
-
-    mfxU32 FrameNumberPreference; // how many surfaces user wants
-    mfxU32 MaxFrameNumber; // maximum frames for transcoding
-    mfxU32 numSurf4Comp;
-    mfxU16 numTiles4Comp;
-
-    mfxU16 nSlices; // number of slices for encoder initialization
-    mfxU16 nMaxSliceSize; //maximum size of slice
-
-    mfxU16 WinBRCMaxAvgKbps;
-    mfxU16 WinBRCSize;
-    mfxU32 BufferSizeInKB;
-    mfxU16 GopPicSize;
-    mfxU16 GopRefDist;
-    mfxU16 NumRefFrame;
-    mfxU16 nNumRefActiveP;
-    mfxU16 nBRefType;
-    mfxU16 RepartitionCheckMode;
-    mfxU16 GPB;
-    mfxU16 nTransformSkip;
-
-    mfxU16 CodecLevel;
-    mfxU16 CodecProfile;
-    mfxU32 MaxKbps;
-    mfxU32 InitialDelayInKB;
-    mfxU16 GopOptFlag;
-    mfxU16 AdaptiveI;
-    mfxU16 AdaptiveB;
-
-    mfxU16 WeightedPred;
-    mfxU16 WeightedBiPred;
-    mfxU16 ExtBrcAdaptiveLTR;
-
-    bool bExtMBQP;
-
-    // MVC Specific Options
-    bool bIsMVC; // true if Multi-View-Codec is in use
-    mfxU32 numViews; // number of views for Multi-View-Codec
-
-    mfxU16 nRotationAngle; // if specified, enables rotation plugin in mfx pipeline
-    msdk_char strVPPPluginDLLPath[MSDK_MAX_FILENAME_LEN]; // plugin dll path and name
-
-    sPluginParams decoderPluginParams;
-    sPluginParams encoderPluginParams;
-
-    mfxU32 nTimeout; // how long transcoding works in seconds
-    mfxU32 nFPS; // limit transcoding to the number of frames per second
-
-    mfxU32 statisticsWindowSize;
-    FILE* statisticsLogFile;
-
-    bool bLABRC; // use look ahead bitrate control algorithm
-    mfxU16 nLADepth; // depth of the look ahead bitrate control  algorithm
-    bool bEnableExtLA;
-    bool bEnableBPyramid;
-    mfxU16 nRateControlMethod;
-    mfxU16 nQPI;
-    mfxU16 nQPP;
-    mfxU16 nQPB;
-    bool bDisableQPOffset;
-    mfxU8 nMinQPI;
-    mfxU8 nMaxQPI;
-    mfxU8 nMinQPP;
-    mfxU8 nMaxQPP;
-    mfxU8 nMinQPB;
-    mfxU8 nMaxQPB;
-
-    mfxU16 nAvcTemp;
-    mfxU16 nBaseLayerPID;
-    mfxU16 nAvcTemporalLayers[8];
-#if defined(_WIN32) || defined(_WIN64)
-    mfxU16 bTemporalLayers;
-    mfxTemporalLayer temporalLayers[8];
-#endif
-    mfxU16 nSPSId;
-    mfxU16 nPPSId;
-    mfxU16 nPicTimingSEI;
-    mfxU16 nNalHrdConformance;
-    mfxU16 nVuiNalHrdParameters;
-    mfxU16 nTransferCharacteristics;
-
-    bool bOpenCL;
-    mfxU16 reserved[4];
-
-    mfxU16 nVppCompDstX;
-    mfxU16 nVppCompDstY;
-    mfxU16 nVppCompDstW;
-    mfxU16 nVppCompDstH;
-    mfxU16 nVppCompSrcW;
-    mfxU16 nVppCompSrcH;
-    mfxU16 nVppCompTileId;
-
-    mfxU32 DecoderFourCC;
-    mfxU32 EncoderFourCC;
-
-    sVppCompDstRect* pVppCompDstRects;
-
-    bool bForceSysMem;
-    mfxU16 DecOutPattern;
-    mfxU16 VppOutPattern;
-    mfxU16 nGpuCopyMode;
-
-    mfxU16 nRenderColorForamt; /*0 NV12 - default, 1 is ARGB*/
-
-    mfxI32 monitorType;
-    bool shouldUseGreedyFormula;
-    bool enableQSVFF;
-    bool bSingleTexture;
-
-    ExtBRCType nExtBRC;
-
-    mfxU16 nAdaptiveMaxFrameSize;
-    mfxU16 LowDelayBRC;
-
-    mfxU16 IntRefType;
-    mfxU16 IntRefCycleSize;
-    mfxU16 IntRefQPDelta;
-    mfxU16 IntRefCycleDist;
-
-    mfxU32 nMaxFrameSize;
-
-    mfxU16 BitrateLimit;
-
-    mfxU16 numMFEFrames;
-    mfxU16 MFMode;
-    mfxU32 mfeTimeout;
-    sSEIMetaMasteringDisplay SEIMetaMDCV;
-    sSEIMetaContentLightLevel SEIMetaCLLI;
-
-    bool bEnableMDCV;
-    bool bEnableCLLI;
-
-    sVideoSignalInfo SignalInfoIn;
-    sVideoSignalInfo SignalInfoOut;
-
-    mfxU16 TargetBitDepthLuma;
-    mfxU16 TargetBitDepthChroma;
-
-#if defined(LIBVA_WAYLAND_SUPPORT)
-    mfxU16 nRenderWinX;
-    mfxU16 nRenderWinY;
-    bool bPerfMode;
-#endif
-
-#if defined(LIBVA_SUPPORT)
-    mfxI32 libvaBackend;
-#endif // defined(MFX_LIBVA_SUPPORT)
-
-    CHWDevice* m_hwdev;
-
-    EPresetModes PresetMode;
-    bool shouldPrintPresets;
-
-    bool rawInput;
-
-    // 3DLut Binary File
-    msdk_char str3DLutFile[MSDK_MAX_FILENAME_LEN] = {};
-    bool bEnable3DLut;
-
-    mfxU16 nMemoryModel;
-
-    mfxPoolAllocationPolicy AllocPolicy = MFX_ALLOCATION_UNLIMITED;
-    bool useAllocHints                  = false;
-    mfxU32 preallocate                  = 0;
-
-    mfxU16 forceSyncAllSession;
-
-    mfxU16 nIVFHeader;
-
-    bool IsSourceMSB      = false;
-    mfxU32 nSyncOpTimeout = MSDK_WAIT_INTERVAL; // SyncOperation timeout in msec
-
-    bool TCBRCFileMode;
-};
-
-struct sInputParams : public __sInputParams {
-    sInputParams();
-    msdk_string DumpLogFileName;
-
-    std::vector<mfxExtEncoderROI> m_ROIData;
-
-    bool bDecoderPostProcessing;
-    bool bROIasQPMAP;
-#ifdef ENABLE_MCTF
-    sMCTFParam mctfParam;
-#endif
-    eAPIVersion verSessionInit;
 };
 
 static const mfxU32 DecoderTargetID = 100;
@@ -529,6 +149,7 @@ struct PreEncAuxBuffer {
 
 struct ExtendedSurface {
     mfxU32 TargetID;
+    mfxU8 FrameAttrib;
 
     mfxFrameSurface1* pSurface;
     PreEncAuxBuffer* pAuxCtrl;
@@ -545,14 +166,10 @@ struct ExtendedBS {
 
 class CIOStat : public CTimeStatistics {
 public:
-    CIOStat() : CTimeStatistics(), ofile(stdout) {
-        MSDK_ZERO_MEMORY(bufDir);
-        DumpLogFileName.clear();
-    }
+    CIOStat() : CTimeStatistics(), DumpLogFileName(), ofile(stdout), bufDir() {}
 
-    CIOStat(const msdk_char* dir) : CTimeStatistics(), ofile(stdout) {
-        msdk_strncopy_s(bufDir, MAX_PREF_LEN, dir, MAX_PREF_LEN - 1);
-        bufDir[MAX_PREF_LEN - 1] = 0;
+    CIOStat(const std::string& dir) : CTimeStatistics(), DumpLogFileName(), ofile(stdout) {
+        bufDir = dir;
     }
 
     ~CIOStat() {}
@@ -561,7 +178,7 @@ public:
         ofile = file;
     }
 
-    inline void SetDumpName(const msdk_char* name) {
+    inline void SetDumpName(const std::string& name) {
         DumpLogFileName = name;
         if (!DumpLogFileName.empty()) {
             TurnOnDumping();
@@ -571,23 +188,19 @@ public:
         }
     }
 
-    inline void SetDirection(const msdk_char* dir) {
-        if (dir) {
-            msdk_strncopy_s(bufDir, MAX_PREF_LEN, dir, MAX_PREF_LEN - 1);
-            bufDir[MAX_PREF_LEN - 1] = 0;
-        }
+    inline void SetDirection(const std::string& dir) {
+        bufDir = dir;
     }
 
     inline void PrintStatistics(mfxU32 numPipelineid,
                                 mfxF64 target_framerate = -1 /*default stands for infinite*/) {
         // print timings in ms
-        msdk_fprintf(
+        fprintf(
             ofile,
-            MSDK_STRING(
-                "stat[%u.%llu]: %s=%d;Framerate=%.3f;Total=%.3lf;Samples=%lld;StdDev=%.3lf;Min=%.3lf;Max=%.3lf;Avg=%.3lf\n"),
-            msdk_get_current_pid(),
+            "stat[%u.%llu]: %s=%d;Framerate=%.3f;Total=%.3lf;Samples=%lld;StdDev=%.3lf;Min=%.3lf;Max=%.3lf;Avg=%.3lf\n",
+            (unsigned int)msdk_get_current_pid(),
             (unsigned long long int)rdtsc(),
-            bufDir,
+            bufDir.c_str(),
             (int)numPipelineid,
             (double)target_framerate,
             (double)GetTotalTime(false),
@@ -599,35 +212,34 @@ public:
         fflush(ofile);
 
         if (!DumpLogFileName.empty()) {
-            msdk_char buf[MSDK_MAX_FILENAME_LEN];
-            msdk_sprintf(buf, MSDK_STRING("%s_ID_%d.log"), DumpLogFileName.c_str(), numPipelineid);
-            DumpDeltas(buf);
+            std::stringstream dump_deltas_log_file_name_sstr;
+            dump_deltas_log_file_name_sstr << DumpLogFileName << "_ID_" << numPipelineid << ".log";
+            DumpDeltas(dump_deltas_log_file_name_sstr.str());
         }
     }
 
-    inline void DumpDeltas(msdk_char* file_name) {
+    inline void DumpDeltas(const std::string& file_name) {
         if (m_time_deltas.empty())
             return;
 
-        FILE* dump_file = NULL;
-        MSDK_FOPEN(dump_file, file_name, MSDK_STRING("a"));
-        if (dump_file) {
+        try {
+            std::ofstream dump_file(file_name, std::ofstream::app);
+            dump_file << std::fixed << std::setprecision(3);
             for (std::vector<mfxF64>::const_iterator it = m_time_deltas.begin();
                  it != m_time_deltas.end();
                  ++it) {
-                fprintf(dump_file, "%.3f, ", (*it));
+                dump_file << (*it) << ", ";
             }
-            fclose(dump_file);
         }
-        else {
+        catch (std::ios::failure&) {
             perror("DumpDeltas: file cannot be open");
         }
     }
 
 protected:
-    msdk_tstring DumpLogFileName;
+    std::string DumpLogFileName;
     FILE* ofile;
-    msdk_char bufDir[MAX_PREF_LEN];
+    std::string bufDir;
 };
 
 class ExtendedBSStore {
@@ -683,7 +295,8 @@ class CTranscodingPipeline;
 class SafetySurfaceBuffer {
 public:
     //this is used only for sanity check
-    mfxU32 TargetID = 0;
+    mfxU32 TargetID       = 0;
+    ProlongStatus Prolong = NormalFrame;
 
     struct SurfaceDescriptor {
         SurfaceDescriptor() : ExtSurface(), Locked(false) {}
@@ -801,8 +414,8 @@ public:
     size_t GetRobustFlag();
     eAPIVersion GetVersionOfSessionInitAPI();
 
-    msdk_string GetSessionText() {
-        msdk_stringstream ss;
+    std::string GetSessionText() {
+        std::stringstream ss;
         ss << m_pmfxSession->operator mfxSession();
 
         return ss.str();
@@ -818,6 +431,10 @@ public:
     void SetAdapterNum(mfxU32 adapterNum = 0) {
         m_adapterNum = adapterNum;
     };
+    void SetSurfaceWaitInterval(mfxU32 surface_wait_interval = MSDK_SURFACE_WAIT_INTERVAL) {
+        m_surface_wait_interval =
+            surface_wait_interval > 0 ? surface_wait_interval : MSDK_SURFACE_WAIT_INTERVAL;
+    };
     void SetSyncOpTimeout(mfxU32 syncOpTimeout = MSDK_WAIT_INTERVAL) {
         m_nSyncOpTimeout = syncOpTimeout;
     };
@@ -830,6 +447,9 @@ public:
     };
     mfxI32 GetAdapterNum() const {
         return m_adapterNum;
+    };
+    mfxU32 GetSurfaceWaitInterval() const {
+        return m_surface_wait_interval;
     };
     mfxU32 GetSyncOpTimeout() const {
         return m_nSyncOpTimeout;
@@ -850,6 +470,9 @@ public:
         return bPreferdGfx;
     };
 #endif
+
+    void PrintLibInfo(VPLImplementationLoader* Loader);
+
 protected:
     virtual mfxStatus CheckRequiredAPIVersion(mfxVersion& version, sInputParams* pParams);
 
@@ -857,6 +480,7 @@ protected:
     virtual mfxStatus Encode();
     virtual mfxStatus Transcode();
     virtual mfxStatus DecodeOneFrame(ExtendedSurface* pExtSurface);
+    virtual mfxStatus CreateBlackFrame(ExtendedSurface* pExtSurface);
     virtual mfxStatus DecodeLastFrame(ExtendedSurface* pExtSurface);
     virtual mfxStatus VPPOneFrame(ExtendedSurface* pSurfaceIn,
                                   ExtendedSurface* pExtSurface,
@@ -914,6 +538,7 @@ protected:
     mfxStatus PutBS();
 
     mfxStatus DumpSurface2File(mfxFrameSurface1* pSurface);
+    mfxStatus ReplaceBlackSurface(mfxFrameSurface1* pSurface);
     mfxStatus Surface2BS(ExtendedSurface* pSurf, mfxBitstreamWrapper* pBS, mfxU32 fourCC);
     mfxStatus NV12toBS(mfxFrameSurface1* pSurface, mfxBitstreamWrapper* pBS);
     mfxStatus I420toBS(mfxFrameSurface1* pSurface, mfxBitstreamWrapper* pBS);
@@ -1066,6 +691,9 @@ protected:
     mfxU32 m_MaxFramesForTranscode;
     mfxU32 m_MaxFramesForEncode;
 
+    mfxU16 m_ExactNframe;
+    mfxU16 m_Prolonged;
+
     // pointer to already extended bs processor
     FileBitstreamProcessor* m_pBSProcessor;
 
@@ -1097,10 +725,10 @@ protected:
     mfxU32 m_QPforI;
     mfxU32 m_QPforP;
 
-    msdk_string m_sGenericPluginPath;
+    std::string m_sGenericPluginPath;
     mfxU16 m_nRotationAngle;
 
-    msdk_string m_strMfxParamsDumpFile;
+    std::string dump_file;
 
     void FillMBQPBuffer(mfxExtMBQP& qpMap, mfxU16 pictStruct);
 
@@ -1120,6 +748,8 @@ protected:
 
     CascadeScalerConfig m_ScalerConfig;
 
+    mfxU32 m_surface_wait_interval =
+        MSDK_SURFACE_WAIT_INTERVAL; // Surface wait when getting free surface from pool
     mfxU32 m_nSyncOpTimeout = MSDK_WAIT_INTERVAL; // SyncOperation timeout in msec
 
 #if (defined(_WIN32) || defined(_WIN64))
@@ -1134,7 +764,11 @@ protected:
     mfxU32 m_n3DLutVMemId;
     mfxU32 m_n3DLutVWidth;
     mfxU32 m_n3DLutVHeight;
-    msdk_char* m_p3DLutFile;
+    std::string m_p3DLutFile;
+
+#if (defined(_WIN32) || defined(_WIN64))
+    mfxStatus CheckHyperEncodeParams(mfxHyperMode hyperMode);
+#endif
 
 private:
     DISALLOW_COPY_AND_ASSIGN(CTranscodingPipeline);

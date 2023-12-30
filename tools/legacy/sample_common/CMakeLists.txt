@@ -22,7 +22,6 @@ if(CMAKE_SYSTEM_NAME MATCHES Linux)
     IMPORTED_TARGET
     GLOBAL)
   pkg_check_modules(PKG_WAYLAND_CLIENT wayland-client IMPORTED_TARGET GLOBAL)
-  pkg_check_modules(PKG_LIBWAYLAND libwayland IMPORTED_TARGET GLOBAL)
   find_program(WAYLAND_SCANNER_BIN "wayland-scanner")
   pkg_check_modules(PKG_WAYLAND_PROTOCOLS "wayland-protocols>=1.15")
 
@@ -176,6 +175,26 @@ if(CMAKE_SYSTEM_NAME MATCHES Linux)
           target_compile_definitions(${TARGET} PUBLIC LIBVA_DRM_SUPPORT)
           target_include_directories(${TARGET}
                                      PUBLIC ${PKG_LIBDRM_INCLUDE_DIRS})
+
+          if("${PKG_LIBDRM_VERSION}" VERSION_GREATER 2.4.113)
+            target_compile_definitions(${TARGET}
+                                       PUBLIC DRM_LINUX_MODIFIER_TILED4_SUPPORT)
+          else()
+            message(
+              STATUS
+                "libdrm version ${PKG_LIBDRM_VERSION} does not support I915_FORMAT_MOD_4_TILED"
+            )
+          endif()
+
+          if("${PKG_LIBDRM_VERSION}" VERSION_GREATER 2.4.107)
+            target_compile_definitions(
+              ${TARGET} PUBLIC DRM_LINUX_FORMAT_MODIFIER_BLOB_SUPPORT)
+          else()
+            message(
+              STATUS
+                "libdrm version ${PKG_LIBDRM_VERSION} does not support drmModeFormatModifierBlobIterNext() API"
+            )
+          endif()
 
           if("${PKG_LIBDRM_VERSION}" VERSION_GREATER 2.4.104)
             target_compile_definitions(${TARGET} PUBLIC DRM_LINUX_HDR_SUPPORT)

@@ -21,42 +21,37 @@ bool FRCAdvancedChecker::IsTimeStampsNear(mfxU64 timeStampRef, mfxU64 timeStampT
         return true;
     }
     else {
-        msdk_printf(MSDK_STRING("\n\nError in FRC Advanced algorithm. \n"));
+        printf("\n\nError in FRC Advanced algorithm. \n");
 
-        msdk_printf(MSDK_STRING("Output frame number is %d\n"), m_numOutputFrames - 1);
+        printf("Output frame number is %d\n", m_numOutputFrames - 1);
 
         int iPTS_Ref = (int)timeStampRef;
         int iPTS_Tst = (int)timeStampTst;
         int iAbsDiff = (int)absDiff;
         int iEps     = (int)eps;
 
-        msdk_printf(
-            MSDK_STRING("Error: refTimeStamp, tstTimeStamp, Diff, Delta are: %d %d %u %d\n"),
-            iPTS_Ref,
-            iPTS_Tst,
-            iAbsDiff,
-            iEps);
+        printf("Error: refTimeStamp, tstTimeStamp, Diff, Delta are: %d %d %u %d\n",
+               iPTS_Ref,
+               iPTS_Tst,
+               iAbsDiff,
+               iEps);
 
         return false;
     }
 
 } // bool IsTimeStampsNear( mfxU64 timeStampTst, mfxU64 timeStampRef,  mfxU64 eps)
 
-FRCAdvancedChecker::FRCAdvancedChecker() {
-    m_minDeltaTime = 0;
-
-    m_bIsSetTimeOffset = false;
-
-    m_timeOffset        = 0;
-    m_expectedTimeStamp = 0;
-    m_timeStampJump     = 0;
-    m_numOutputFrames   = 0;
-
-    m_bReadyOutput           = false;
-    m_defferedInputTimeStamp = 0;
-
-    memset(&m_videoParam, 0, sizeof(m_videoParam));
-} // FRCAdvancedChecker::FRCAdvancedChecker()
+FRCAdvancedChecker::FRCAdvancedChecker()
+        : m_minDeltaTime(0),
+          m_bIsSetTimeOffset(false),
+          m_timeOffset(0),
+          m_expectedTimeStamp(0),
+          m_timeStampJump(0),
+          m_numOutputFrames(0),
+          m_bReadyOutput(false),
+          m_defferedInputTimeStamp(0),
+          m_videoParam({ 0 }),
+          m_ptsList() {} // FRCAdvancedChecker::FRCAdvancedChecker()
 
 mfxStatus FRCAdvancedChecker::Init(mfxVideoParam* par, mfxU32 /*asyncDeep*/) {
     m_videoParam = *par;

@@ -131,11 +131,14 @@ struct sInputParams {
 
     bool bIgnoreLevelConstrain;
 
-    msdk_char strSrcFile[MSDK_MAX_FILENAME_LEN];
-    msdk_char strDstFile[MSDK_MAX_FILENAME_LEN];
+    char strSrcFile[MSDK_MAX_FILENAME_LEN];
+    char strDstFile[MSDK_MAX_FILENAME_LEN];
 
     bool bDisableFilmGrain;
     eAPIVersion verSessionInit;
+    std::string m_decode_cfg;
+    std::string m_vpp_cfg;
+    std::string dump_file;
 };
 
 struct CPipelineStatistics {
@@ -176,7 +179,8 @@ public:
     virtual mfxStatus ResetDevice();
 
     void SetMultiView();
-    virtual void PrintInfo();
+    virtual void PrintLibInfo();
+    virtual void PrintStreamInfo();
     mfxU64 GetTotalBytesProcessed() {
         return totalBytesProcessed + m_mfxBS.DataOffset;
     }
@@ -184,16 +188,16 @@ public:
     inline void PrintDecodeErrorReport(mfxExtDecodeErrorReport* pDecodeErrorReport) {
         if (pDecodeErrorReport) {
             if (pDecodeErrorReport->ErrorTypes & MFX_ERROR_SPS)
-                msdk_printf(MSDK_STRING("[Error] SPS Error detected!\n"));
+                printf("[Error] SPS Error detected!\n");
 
             if (pDecodeErrorReport->ErrorTypes & MFX_ERROR_PPS)
-                msdk_printf(MSDK_STRING("[Error] PPS Error detected!\n"));
+                printf("[Error] PPS Error detected!\n");
 
             if (pDecodeErrorReport->ErrorTypes & MFX_ERROR_SLICEHEADER)
-                msdk_printf(MSDK_STRING("[Error] SliceHeader Error detected!\n"));
+                printf("[Error] SliceHeader Error detected!\n");
 
             if (pDecodeErrorReport->ErrorTypes & MFX_ERROR_FRAME_GAP)
-                msdk_printf(MSDK_STRING("[Error] Frame Gap Error detected!\n"));
+                printf("[Error] Frame Gap Error detected!\n");
         }
     }
 

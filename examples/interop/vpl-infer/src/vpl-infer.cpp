@@ -5,7 +5,7 @@
 //==============================================================================
 
 ///
-/// A minimal oneAPI Video Processing Library (oneVPL) decode, vpp and infer application,
+/// A minimal Intel® Video Processing Library (Intel® VPL) decode, vpp and infer application,
 /// using 2.x API with internal memory management,
 /// showing zerocopy with remoteblob
 ///
@@ -19,8 +19,12 @@
 
 #include <openvino/openvino.hpp>
 
-#if defined(__linux__) && defined(ZEROCOPY)
-    #include <openvino/runtime/intel_gpu/ocl/va.hpp>
+#ifdef ZEROCOPY
+    #if defined(_WIN32) || defined(_WIN64)
+        #include <openvino/runtime/intel_gpu/ocl/dx.hpp>
+    #else
+        #include <openvino/runtime/intel_gpu/ocl/va.hpp>
+    #endif
     #include <openvino/runtime/intel_gpu/properties.hpp>
 #endif
 
@@ -36,22 +40,24 @@ using namespace ov::preprocess;
 void Usage(void) {
     printf("\n");
     printf("   Usage    :    vpl-infer \n\n");
-    printf("     -hw         use hardware implementation (default)\n");
     printf("     -i          input file name (HEVC elementary stream)\n");
     printf("     -m          input model name (object detection)\n");
-#if defined(__linux__) && defined(ZEROCOPY)
-    printf(
-        "     -zerocopy   process without copying data between oneVPL and OpenVINO in hardware implemenation mode\n");
+#ifdef ZEROCOPY
+    printf("     -zerocopy   process without creating an additional copy of the data\n");
 #endif
     printf("     -legacy     run sample in legacy gen (ex: gen 9.x - SKL, KBL, CFL, etc)\n\n");
-    printf("   Example  :    vpl-infer -hw -i in.h265 -m mobilenet-ssd.xml\n\n");
+    printf("   Example  :    vpl-infer -i in.h265 -m mobilenet-ssd.xml\n\n");
     return;
 }
 
 mfxSession CreateVPLSession(mfxLoader *loader, Params *cli);
 
-#if defined(__linux__) && defined(ZEROCOPY)
+#ifdef ZEROCOPY
+    #if defined(_WIN32) || defined(_WIN64)
+mfxStatus InferFrame(ov::intel_gpu::ocl::D3DContext context,
+    #else
 mfxStatus InferFrame(ov::intel_gpu::ocl::VAContext context,
+    #endif
                      mfxFrameSurface1 *surface,
                      ov::InferRequest inferRequest,
                      std::string inputName,
@@ -71,7 +77,7 @@ int main(int argc, char **argv) {
     Params cliParams = {};
     FILE *source     = NULL;
 
-    //-- Params for oneVPL decode/vpp session
+    //-- Params for decode/vpp session
     mfxLoader loader                    = NULL;
     mfxSession session                  = NULL;
     mfxBitstream bitstream              = {};
@@ -105,8 +111,13 @@ int main(int argc, char **argv) {
     mfxConfig cfg[4]     = {};
     mfxVariant cfgVal[4] = {};
 
-#if defined(__linux__) && defined(ZEROCOPY)
+#ifdef ZEROCOPY
+    #if defined(_WIN32) || defined(_WIN64)
+    ID3D11Device *pD3D11Device;
+    #else
     VADisplay lvaDisplay;
+    #endif
+    bool bIsSharedContextReady = false;
 #endif
 
     mfxU16 oriImgWidth, oriImgHeight;
@@ -128,13 +139,13 @@ int main(int argc, char **argv) {
         ov::InferRequest inferRequest;
         ov::CompiledModel compiledModel;
 
-        //-- [OpenVINO] Get OpenVINO runtime version
+        //-- Get runtime version
         std::cout << ov::get_openvino_version() << std::endl;
 
-        //-- [OpenVINO] Initialize OpenVINO Runtime Core
+        //-- Initialize Runtime Core
         ov::Core core;
 
-        //-- [OpenVINO] Read a network model
+        //-- Read a network model
         const std::string modelPath = TSTRING2STRING(cliParams.inmodelName);
 
         std::cout << "Loading network model files: " << modelPath << std::endl;
@@ -158,16 +169,16 @@ int main(int argc, char **argv) {
         ov::Shape inputShape   = input.get_shape();
         ov::Layout inputLayout = ov::layout::get_layout(input);
 
-        // Stores output layer dimension for oneVPL vpp output configuration
+        // Store output layer dimension for vpp output configuration
         inputDimWidth  = static_cast<mfxU16>(inputShape[ov::layout::width_idx(inputLayout)]);
         inputDimHeight = static_cast<mfxU16>(inputShape[ov::layout::height_idx(inputLayout)]);
 
-        //-- [OpenVINO] Configure preprocessing
+        //-- Configure preprocessing
         PrePostProcessor ppp(model);
         InputInfo &inputInfo = ppp.input(inputTensorName);
 
         // Set the input tensor
-#if defined(__linux__) && defined(ZEROCOPY)
+#ifdef ZEROCOPY
         if (cliParams.bZeroCopy) {
             inputInfo.tensor()
                 .set_element_type(ov::element::u8)
@@ -182,16 +193,16 @@ int main(int argc, char **argv) {
                 .set_color_format(ColorFormat::NV12_TWO_PLANES, { "y", "uv" });
         }
 
-        // Convert oneVPL vpp output to BGR plannar in OpenVINO
+        // Convert vpp output to BGR plannar
         inputInfo.preprocess().convert_color(ov::preprocess::ColorFormat::BGR);
 
         inputInfo.model().set_layout("NCHW");
 
         model = ppp.build();
 
-        //-- [oneVPL] Create VPL session
+        //-- Create session
         session = CreateVPLSession(&loader, &cliParams);
-        VERIFY(session != NULL, "ERROR: not able to create VPL session");
+        VERIFY(session != NULL, "ERROR: unable to create session");
 
 #ifdef __linux__
         if (cliParams.bLegacyGen) {
@@ -200,7 +211,7 @@ int main(int argc, char **argv) {
         }
 #endif
 
-        //-- [oneVPL] Initialize oneVPL decoder
+        //-- Initialize decoder
         // Prepare input bitstream
         bitstream.MaxLength = BITSTREAM_BUFFER_SIZE;
         bitstream.Data      = (mfxU8 *)calloc(bitstream.MaxLength, sizeof(mfxU8));
@@ -225,7 +236,7 @@ int main(int argc, char **argv) {
         oriImgWidth  = mfxDecParams.mfx.FrameInfo.Width;
         oriImgHeight = mfxDecParams.mfx.FrameInfo.Height;
 
-        //-- [oneVPL] Initialize oneVPL VPP for resizing and color space conversion
+        //-- Initialize VPP for resizing and color space conversion
         // Prepare vpp in/out params
         // vpp in:  decode output image size
         // vpp out: network model input size
@@ -300,25 +311,8 @@ int main(int argc, char **argv) {
         sts = MFXVideoVPP_Init(session, &mfxVPPParams);
         VERIFY(MFX_ERR_NONE == sts, "ERROR: initializing VPP");
 
-#if defined(__linux__) && defined(ZEROCOPY)
-        if (cliParams.bZeroCopy) {
-            // Get the vaapi device handle
-            sts = MFXVideoCORE_GetHandle(session, MFX_HANDLE_VA_DISPLAY, &lvaDisplay);
-            VERIFY(MFX_ERR_NONE == sts, "ERROR: MFXVideoCore_GetHandle error");
-
-            //-- [OpenVINO] Create inference request from shared context object
-            auto sharedVAContext = ov::intel_gpu::ocl::VAContext(core, lvaDisplay);
-
-            // Compile network within a shared context
-            compiledModel = core.compile_model(model, sharedVAContext);
-        }
-        else
-#endif
-        {
-            // Compile network
-            compiledModel = core.compile_model(model, "GPU");
-        }
-
+        // Compile network
+        compiledModel = core.compile_model(model, "GPU");
         // Create inference request
         inferRequest = compiledModel.create_infer_request();
 
@@ -341,7 +335,7 @@ int main(int argc, char **argv) {
                                "ERROR: no more available surface for decode out and vpp in");
                     }
                 }
-                //-- [oneVPL] Decode a frame
+                //-- Decode a frame
                 sts = MFXVideoDECODE_DecodeFrameAsync(
                     session,
                     (isDrainingDec) ? NULL : &bitstream,
@@ -362,7 +356,7 @@ int main(int argc, char **argv) {
                 case MFX_ERR_NONE:
                     pmfxVPPOutSurface = NULL;
 
-                    //-- [oneVPL] Resize and convert color space of decoded surface
+                    //-- Resize and convert color space of decoded surface
                     if (cliParams.bLegacyGen) {
                         if (MFX_ERR_MORE_SURFACE == sts || MFX_ERR_NONE == sts) {
                             nIndex2 = GetFreeSurfaceIndex(pmfxVPPSurfPool, nSurfNumVPPOut);
@@ -405,7 +399,7 @@ int main(int argc, char **argv) {
                             frameNum++;
                         }
                         else {
-#if defined(__linux__) && defined(ZEROCOPY)
+#ifdef ZEROCOPY
                             if (cliParams.bZeroCopy) {
                                 sts = pmfxVPPOutSurface->FrameInterface->Synchronize(
                                     pmfxVPPOutSurface,
@@ -413,11 +407,54 @@ int main(int argc, char **argv) {
                                 VERIFY(MFX_ERR_NONE == sts,
                                        "ERROR: MFXVideoCORE_SyncOperation failed");
 
-                                //-- [OpenVINO] Infer from shared context and va surface
+                                if (bIsSharedContextReady == false) {
+                                    mfxHandleType device_type;
+    #if defined(_WIN32) || defined(_WIN64)
+                                    // Get the d3d device handle
+                                    pmfxVPPOutSurface->FrameInterface->GetDeviceHandle(
+                                        pmfxVPPOutSurface,
+                                        (mfxHDL *)&pD3D11Device,
+                                        &device_type);
+                                    VERIFY(MFX_ERR_NONE == sts,
+                                           "ERROR: mfxFrameInterface.GetDeviceHandle error");
+
+                                    //-- Create inference request from shared context object
+                                    auto sharedD3D11Context =
+                                        ov::intel_gpu::ocl::D3DContext(core, pD3D11Device);
+
+                                    // Compile network within a shared context
+                                    compiledModel = core.compile_model(model, sharedD3D11Context);
+    #else
+                                    // Get the vaapi device handle
+                                    pmfxVPPOutSurface->FrameInterface->GetDeviceHandle(
+                                        pmfxVPPOutSurface,
+                                        &lvaDisplay,
+                                        &device_type);
+                                    VERIFY(MFX_ERR_NONE == sts,
+                                           "ERROR: mfxFrameInterface.GetDeviceHandle error");
+
+                                    //-- Create inference request from shared context object
+                                    auto sharedVAContext =
+                                        ov::intel_gpu::ocl::VAContext(core, lvaDisplay);
+
+                                    // Compile network within a shared context
+                                    compiledModel = core.compile_model(model, sharedVAContext);
+    #endif
+                                    inferRequest = compiledModel.create_infer_request();
+
+                                    bIsSharedContextReady = true;
+                                }
+
+                                //-- Infer from shared context and va surface
                                 auto context = compiledModel.get_context();
-                                auto &vaContext =
+    #if defined(_WIN32) || defined(_WIN64)
+                                auto &sharedContext =
+                                    static_cast<ov::intel_gpu::ocl::D3DContext &>(context);
+    #else
+                                auto &sharedContext =
                                     static_cast<ov::intel_gpu::ocl::VAContext &>(context);
-                                InferFrame(vaContext,
+    #endif
+                                InferFrame(sharedContext,
                                            pmfxVPPOutSurface,
                                            inferRequest,
                                            inputTensorName,
@@ -546,8 +583,12 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-#if defined(__linux__) && defined(ZEROCOPY)
+#ifdef ZEROCOPY
+    #if defined(_WIN32) || defined(_WIN64)
+mfxStatus InferFrame(ov::intel_gpu::ocl::D3DContext context,
+    #else
 mfxStatus InferFrame(ov::intel_gpu::ocl::VAContext context,
+    #endif
                      mfxFrameSurface1 *surface,
                      ov::InferRequest inferRequest,
                      std::string inputName,
@@ -555,7 +596,11 @@ mfxStatus InferFrame(ov::intel_gpu::ocl::VAContext context,
                      mfxU16 oriWidth,
                      mfxU16 oriHeight) {
     mfxStatus sts = MFX_ERR_NONE;
+    #if defined(_WIN32) || defined(_WIN64)
+    ID3D11Texture2D *pD3D11Texture;
+    #else
     VASurfaceID lvaSurfaceID;
+    #endif
     mfxHDL lresource;
     mfxResourceType lresourceType;
 
@@ -566,28 +611,34 @@ mfxStatus InferFrame(ov::intel_gpu::ocl::VAContext context,
 
     std::cout << "Result: " << std::endl;
 
+    #if defined(_WIN32) || defined(_WIN64)
+    pD3D11Texture = (ID3D11Texture2D *)lresource;
+    // Wrap VPP output into remoteblobs and set it as inference input tensor
+    auto nv12Tensor =
+        context.create_tensor_nv12(surface->Info.CropH, surface->Info.CropW, pD3D11Texture);
+    #else
     lvaSurfaceID = *(VASurfaceID *)lresource;
-
     // Wrap VPP output into remoteblobs and set it as inference input tensor
     auto nv12Tensor =
         context.create_tensor_nv12(surface->Info.CropH, surface->Info.CropW, lvaSurfaceID);
+    #endif
 
     inferRequest.set_input_tensor(0, nv12Tensor.first);
     inferRequest.set_input_tensor(1, nv12Tensor.second);
 
-    //-- [OpenVINO] Infers specified input(s) in synchronous mode
+    //-- Infers specified input(s) in synchronous mode
     inferRequest.infer();
 
     auto outputTensor = inferRequest.get_tensor(outputName);
 
-    // Display label id, bounding box rect info, and confidence % of detected object
+    // Display class id, bounding box rect info, and confidence score of detected object
     size_t lastDim = outputTensor.get_shape().back();
 
     if (lastDim == 7) {
         float *data = (float *)outputTensor.data();
         for (size_t i = 0; i < outputTensor.get_size() / lastDim; i++) {
             int imageId      = static_cast<int>(data[i * lastDim + 0]);
-            int labelId      = static_cast<int>(data[i * lastDim + 1]);
+            int classId      = static_cast<int>(data[i * lastDim + 1]);
             float confidence = data[i * lastDim + 2];
             auto x_min       = static_cast<int>(data[i * lastDim + 3] * oriWidth);
             auto y_min       = static_cast<int>(data[i * lastDim + 4] * oriHeight);
@@ -599,8 +650,8 @@ mfxStatus InferFrame(ov::intel_gpu::ocl::VAContext context,
                 continue;
             }
 
-            printf("    Label Id (%d),  BBox (%4d, %4d, %4d, %4d),  Confidence (%5.3f)\n",
-                   labelId,
+            printf("    Class ID (%d),  BBox (%4d, %4d, %4d, %4d),  Confidence (%5.3f)\n",
+                   classId,
                    x_min,
                    y_min,
                    x_max,
@@ -673,19 +724,19 @@ void InferFrame(mfxFrameSurface1 *surface,
         inferRequest.set_input_tensor(1, inputTensorUV);
     }
 
-    //-- [OpenVINO] Infers specified input(s) in synchronous mode
+    //-- Infers specified input(s) in synchronous mode
     inferRequest.infer();
 
     auto outputTensor = inferRequest.get_tensor(outputName);
 
-    // Display label id, bounding box rect info, and confidence % of detected object
+    // Display class id, bounding box rect info, and confidence % of detected object
     size_t lastDim = outputTensor.get_shape().back();
 
     if (lastDim == 7) {
         float *data = (float *)outputTensor.data();
         for (size_t i = 0; i < outputTensor.get_size() / lastDim; i++) {
             int imageId      = static_cast<int>(data[i * lastDim + 0]);
-            int labelId      = static_cast<int>(data[i * lastDim + 1]);
+            int classId      = static_cast<int>(data[i * lastDim + 1]);
             float confidence = data[i * lastDim + 2];
             auto x_min       = static_cast<int>(data[i * lastDim + 3] * oriWidth);
             auto y_min       = static_cast<int>(data[i * lastDim + 4] * oriHeight);
@@ -697,8 +748,8 @@ void InferFrame(mfxFrameSurface1 *surface,
                 continue;
             }
 
-            printf("    Label Id (%d),  BBox (%4d, %4d, %4d, %4d),  Confidence (%5.3f)\n",
-                   labelId,
+            printf("    Class Id (%d),  BBox (%4d, %4d, %4d, %4d),  Confidence (%5.3f)\n",
+                   classId,
                    x_min,
                    y_min,
                    x_max,
@@ -728,12 +779,6 @@ mfxSession CreateVPLSession(mfxLoader *loader, Params *cli) {
     VERIFY2(NULL != cfg[0], "MFXCreateConfig failed")
     cfgVal.Type     = MFX_VARIANT_TYPE_U32;
     cfgVal.Data.U32 = MFX_IMPL_TYPE_HARDWARE;
-    if (cli->bZeroCopy) {
-        cfgVal.Type     = MFX_VARIANT_TYPE_U32;
-        cfgVal.Data.U32 = MFX_IMPL_TYPE_HARDWARE;
-    }
-    else
-        cfgVal = cli->implValue;
 
     sts = MFXSetConfigFilterProperty(cfg[0], (mfxU8 *)"mfxImplDescription.Impl", cfgVal);
     VERIFY2(MFX_ERR_NONE == sts, "ERROR: MFXSetConfigFilterProperty failed for Impl");

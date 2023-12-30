@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: MIT
 # ##############################################################################
-cmake_minimum_required(VERSION 3.10.2)
+cmake_minimum_required(VERSION 3.13.0)
 project(vpl-infer)
 
 # Default install places 64 bit runtimes in the environment, so we want to do a
@@ -47,10 +47,10 @@ target_link_libraries(${TARGET} VPL::dispatcher)
 
 find_package(OpenVINO COMPONENTS Runtime)
 if(OpenVINO_FOUND)
-  message(STATUS "OpenVINO found")
+  message(STATUS "Intel® Distribution of OpenVINO™ toolkit found")
   target_link_libraries(${TARGET} openvino::runtime)
 else()
-  message(FATAL_ERROR "OpenVINO not found")
+  message(FATAL_ERROR "Intel® Distribution of OpenVINO™ toolkit not found")
 endif()
 
 if(UNIX)
@@ -105,10 +105,10 @@ if(UNIX)
     message("Using OpenCL library ${OpenCL_LIBRARIES}")
     target_link_libraries(${TARGET} ${OpenCL_LIBRARIES})
 
-    # check opencl cpp headers existence for openvino Compute Library for Deep
-    # Neural Networks (CLDNN) using dpkg-query it comes with opencl-clhpp-
-    # headers, which is one of dependencies of opencl- headers package dpkg-
-    # query result is 0 if opencl-headers package exists
+    # check OpenCL headers for Compute Library for Deep Neural Networks using
+    # dpkg-query it comes with opencl-clhpp- headers, which is one of
+    # dependencies of opencl- headers package dpkg- query result is 0 if opencl-
+    # headers package exists
     execute_process(
       COMMAND dpkg-query -s opencl-headers
       WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
@@ -128,13 +128,43 @@ if(UNIX)
   else()
     message(FATAL_ERROR "OpenCL not found")
   endif()
+else()
+  if(DEFINED ENV{OpenCL_LIBRARY_PATH} AND DEFINED ENV{OpenCL_INCLUDE_DIRS})
+    target_link_libraries(${TARGET} "$ENV{OpenCL_LIBRARY_PATH}\\OpenCL.lib")
+    target_include_directories(${TARGET} PUBLIC $ENV{OpenCL_INCLUDE_DIRS})
+    add_definitions(-DZEROCOPY)
+  endif()
+endif()
+
+# copy dependent dlls to target location
+if(WIN32)
+  if(${CMAKE_VERSION} VERSION_LESS "3.26")
+    message(
+      STATUS
+        "CMake Version less than 3.26, unable to copy dependent DLLs to target location"
+    )
+  else()
+    add_custom_command(
+      TARGET ${TARGET}
+      POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy -t $<TARGET_FILE_DIR:${TARGET}>
+              $<TARGET_RUNTIME_DLLS:${TARGET}>
+      COMMAND_EXPAND_LISTS)
+  endif()
 endif()
 
 include(CTest)
 set(VPL_CONTENT_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/../../content
     CACHE PATH "Path to content.")
-add_test(
-  NAME ${TARGET}-test
-  COMMAND ${TARGET} -i "${VPL_CONTENT_DIR}/cars_320x240.h265" -m
-          "${VPL_CONTENT_DIR}/public/mobilenet-ssd/FP32/mobilenet-ssd.xml")
+if("${TEST_ZERO_COPY}")
+  add_test(
+    NAME ${TARGET}-zerocopy-test
+    COMMAND ${TARGET} -i "${VPL_CONTENT_DIR}/cars_320x240.h265" -zerocopy -m
+            "/OpenVINO/public/mobilenet-ssd/FP32/mobilenet-ssd.xml")
+endif()
+if("${TEST_LEGACY_API}")
+  add_test(NAME ${TARGET}-legacyapi-test
+           COMMAND ${TARGET} -i "${VPL_CONTENT_DIR}/cars_320x240.h265" -legacy
+                   -m "/OpenVINO/public/mobilenet-ssd/FP32/mobilenet-ssd.xml")
+endif()

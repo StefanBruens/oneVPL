@@ -91,20 +91,20 @@ mfxStatus CVAAPIDeviceX11::Init(mfxHDL hWindow, mfxU16 nViews, mfxU32 nAdapterNu
         version.name                                    = driverName;
 
         if (!ioctl(m_dri_fd, DRM_IOWR(0, drm_version), &version) &&
-            !strcmp(driverName, MFX_DEVICE_DRIVER_NAME)) {
+            msdk_match(driverName, MFX_DEVICE_DRIVER_NAME)) {
             break;
         }
         close(m_dri_fd);
     }
 
     if (m_dri_fd < 0) {
-        msdk_printf(MSDK_STRING("Failed to open dri device\n"));
+        printf("Failed to open dri device\n");
         return MFX_ERR_NOT_INITIALIZED;
     }
 
     m_bufmgr = drmintellib.drm_intel_bufmgr_gem_init(m_dri_fd, 4096);
     if (!m_bufmgr) {
-        msdk_printf(MSDK_STRING("Failed to get buffer manager\n"));
+        printf("Failed to get buffer manager\n");
         return MFX_ERR_NOT_INITIALIZED;
     }
 
@@ -233,7 +233,7 @@ mfxStatus CVAAPIDeviceX11::RenderFrame(mfxFrameSurface1* pSurface,
     }
 
     if (memId && memId->m_buffer_info.mem_type != VA_SURFACE_ATTRIB_MEM_TYPE_DRM_PRIME) {
-        msdk_printf(MSDK_STRING("Memory type invalid!\n"));
+        printf("Memory type invalid!\n");
         return MFX_ERR_UNSUPPORTED;
     }
 
@@ -265,26 +265,26 @@ mfxStatus CVAAPIDeviceX11::RenderFrame(mfxFrameSurface1* pSurface,
                 bpp = 32;
                 break;
             default:
-                msdk_printf(MSDK_STRING("Invalid depth\n"));
+                printf("Invalid depth\n");
         }
 
         width  = pSurface->Info.CropX + pSurface->Info.CropW;
         height = pSurface->Info.CropY + pSurface->Info.CropH;
 
-        stride = width * bpp / 8;
+        stride = memId->m_image.pitches[0];
         size   = PAGE_ALIGN(stride * height);
 
         bo = drmintellib.drm_intel_bo_gem_create_from_prime(m_bufmgr,
                                                             memId->m_buffer_info.handle,
                                                             size);
         if (!bo) {
-            msdk_printf(MSDK_STRING("Failed to create buffer object\n"));
+            printf("Failed to create buffer object\n");
             return MFX_ERR_INVALID_VIDEO_PARAM;
         }
 
         drmintellib.drm_intel_bo_gem_export_to_prime(bo, &fd);
         if (!fd) {
-            msdk_printf(MSDK_STRING("Invalid fd\n"));
+            printf("Invalid fd\n");
             return MFX_ERR_NOT_INITIALIZED;
         }
 
@@ -303,9 +303,8 @@ mfxStatus CVAAPIDeviceX11::RenderFrame(mfxFrameSurface1* pSurface,
                                                              bpp,
                                                              fd);
         if ((error = xcblib.xcb_request_check(m_xcbconn, cookie))) {
-            msdk_printf(
-                MSDK_STRING(
-                    "Failed to create xcb pixmap from the %s surface: try another color format (e.g. RGB4)\n"),
+            printf(
+                "Failed to create xcb pixmap from the %s surface: try another color format (e.g. RGB4)\n",
                 ColorFormatToStr(pSurface->Info.FourCC));
             free(error);
             return MFX_ERR_INVALID_HANDLE;
@@ -329,7 +328,7 @@ mfxStatus CVAAPIDeviceX11::RenderFrame(mfxFrameSurface1* pSurface,
                                                           0,
                                                           NULL);
         if ((error = xcblib.xcb_request_check(m_xcbconn, cookie))) {
-            msdk_printf(MSDK_STRING("Failed to present pixmap\n"));
+            printf("Failed to present pixmap\n");
             free(error);
             return MFX_ERR_UNKNOWN;
         }
@@ -349,6 +348,7 @@ mfxStatus CVAAPIDeviceX11::RenderFrame(mfxFrameSurface1* pSurface,
 
 CVAAPIDeviceWayland::~CVAAPIDeviceWayland(void) {
     Close();
+    m_WaylandClient.WaylandDestroy((MfxLoader::Wayland*)m_Wayland);
 }
 
 mfxStatus CVAAPIDeviceWayland::Init(mfxHDL hWindow, mfxU16 nViews, mfxU32 nAdapterNum) {
@@ -414,7 +414,7 @@ mfxStatus CVAAPIDeviceWayland::RenderFrame(mfxFrameSurface1* pSurface,
                                                offsets,
                                                pitches);
     if (NULL == m_wl_buffer) {
-        msdk_printf("\nCan't wrap flink to wl_buffer\n");
+        printf("\nCan't wrap flink to wl_buffer\n");
         mfx_res = MFX_ERR_UNKNOWN;
         return mfx_res;
     }
@@ -459,7 +459,7 @@ mfxStatus CVAAPIDeviceDRM::Init(mfxHDL hWindow, mfxU16 nViews, mfxU32 nAdapterNu
             m_rndr = new drmRenderer(m_DRMLibVA.getFD(), *monitorType);
         }
         catch (...) {
-            msdk_printf(MSDK_STRING("vaapi_device: failed to initialize drmrender\n"));
+            printf("vaapi_device: failed to initialize drmrender\n");
             return MFX_ERR_UNKNOWN;
         }
         return MFX_ERR_NONE;

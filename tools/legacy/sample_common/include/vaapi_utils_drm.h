@@ -103,16 +103,16 @@ public:
     virtual void release(mfxMemId mid, void* mem);
 
     static uint32_t getConnectorType(mfxI32 monitor_type);
-    static const msdk_char* getConnectorName(uint32_t connector_type);
+    static const char* getConnectorName(uint32_t connector_type);
 
 private:
     drmModeObjectPropertiesPtr getProperties(int fd, int objectId, int32_t objectTypeId);
     bool getConnector(drmModeRes* resource, uint32_t connector_type);
     bool setupConnection(drmModeRes* resource, drmModeConnector* connector);
     bool getPlane();
+    bool getAllFormatsAndModifiers();
 
     bool getConnectorProperties(int fd, int connectorId);
-    bool getCRTCProperties(int fd, int crtcId);
 
     bool setMaster();
     void dropMaster();
@@ -125,7 +125,6 @@ private:
     const uint8_t* edidFindCeaExtensionBlock(const uint8_t* edid);
     uint32_t getConnectorPropertyId(const char* propNameToFind);
     uint32_t getConnectorPropertyValue(const char* propNameToFind);
-    uint32_t getCRTCPropertyId(const char* propNameToFind);
     int drmSetColorSpace(bool enableBT2020);
     int drmSendHdrMetaData(mfxExtMasteringDisplayColourVolume* displayColor,
                            mfxExtContentLightLevelInfo* contentLight,
@@ -152,6 +151,7 @@ private:
     #if defined(DRM_LINUX_HDR_SUPPORT)
     struct drmHdrMetaData m_hdrMetaData;
     #endif
+    bool m_bRequiredTiled4;
     mfxFrameSurface1* m_pCurrentRenderTargetSurface;
 
 private:

@@ -8,9 +8,10 @@
 #include <memory>
 #include "sample_utils.h"
 
-#define MSDK_ALIGN32(X) (((mfxU32)((X) + 31)) & (~(mfxU32)31))
-#define ID_BUFFER       MFX_MAKEFOURCC('B', 'U', 'F', 'F')
-#define ID_FRAME        MFX_MAKEFOURCC('F', 'R', 'M', 'E')
+#define MSDK_ALIGN32(X)       (((mfxU32)((X) + 31)) & (~(mfxU32)31))
+#define ID_BUFFER             MFX_MAKEFOURCC('B', 'U', 'F', 'F')
+#define ID_FRAME              MFX_MAKEFOURCC('F', 'R', 'M', 'E')
+#define ALIGN_TO_PAGE_SIZE(p) (((uint64_t)p + 4095) & (~(uint64_t)4095))
 
 SysMemFrameAllocator::SysMemFrameAllocator()
         : m_pBufferAllocator(0),
@@ -78,7 +79,7 @@ mfxStatus SysMemFrameAllocator::LockFrame(mfxMemId mid, mfxFrameData* ptr) {
 
     mfxU16 Width2  = (mfxU16)MSDK_ALIGN32(fs->info.Width);
     mfxU16 Height2 = (mfxU16)MSDK_ALIGN32(fs->info.Height);
-    ptr->B = ptr->Y = (mfxU8*)fs + MSDK_ALIGN32(sizeof(sFrame));
+    ptr->B = ptr->Y = (mfxU8*)fs + ALIGN_TO_PAGE_SIZE(sizeof(sFrame));
 
     switch (fs->info.FourCC) {
         case MFX_FOURCC_NV12:
@@ -167,9 +168,7 @@ mfxStatus SysMemFrameAllocator::LockFrame(mfxMemId mid, mfxFrameData* ptr) {
             ptr->PitchHigh = 0;
             ptr->PitchLow  = (mfxU16)MSDK_ALIGN32(fs->info.Width * 2);
             break;
-#if (MFX_VERSION >= MFX_VERSION_NEXT)
         case MFX_FOURCC_P016:
-#endif
         case MFX_FOURCC_P010:
             ptr->U         = ptr->Y + Width2 * Height2 * 2;
             ptr->V         = ptr->U + 2;
@@ -190,7 +189,6 @@ mfxStatus SysMemFrameAllocator::LockFrame(mfxMemId mid, mfxFrameData* ptr) {
             ptr->PitchHigh = (mfxU16)((4 * MSDK_ALIGN32(fs->info.Width)) / (1 << 16));
             ptr->PitchLow  = (mfxU16)((4 * MSDK_ALIGN32(fs->info.Width)) % (1 << 16));
             break;
-#if (MFX_VERSION >= MFX_VERSION_NEXT)
         case MFX_FOURCC_Y416:
             ptr->U16       = (mfxU16*)ptr->B;
             ptr->Y16       = ptr->U16 + 1;
@@ -200,7 +198,6 @@ mfxStatus SysMemFrameAllocator::LockFrame(mfxMemId mid, mfxFrameData* ptr) {
             ptr->PitchLow  = (mfxU16)(8 * MSDK_ALIGN32(fs->info.Width) % (1 << 16));
             break;
         case MFX_FOURCC_Y216:
-#endif
         case MFX_FOURCC_Y210:
             ptr->Y16 = (mfxU16*)ptr->B;
             ptr->U16 = ptr->Y16 + 1;
@@ -320,19 +317,14 @@ static mfxU32 GetSurfaceSize(mfxU32 FourCC, mfxU32 Width2, mfxU32 Height2) {
             break;
         case MFX_FOURCC_P210:
         case MFX_FOURCC_Y210:
-#if (MFX_VERSION >= MFX_VERSION_NEXT)
         case MFX_FOURCC_Y216:
-#endif
             nbytes = Width2 * Height2 + (Width2 >> 1) * (Height2) + (Width2 >> 1) * (Height2);
             nbytes *= 2; // 16bits
             break;
-
-#if (MFX_VERSION >= MFX_VERSION_NEXT)
         case MFX_FOURCC_Y416:
             nbytes =
                 (Width2 * Height2 + Width2 * Height2 + Width2 * Height2 + Width2 * Height2) * 2;
             break;
-#endif
 
         default:
             break;
@@ -366,7 +358,7 @@ mfxStatus SysMemFrameAllocator::ReallocImpl(mfxMemId mid,
         return sts;
 
     sts = m_pBufferAllocator->Alloc(m_pBufferAllocator->pthis,
-                                    MSDK_ALIGN32(nbytes) + MSDK_ALIGN32(sizeof(sFrame)),
+                                    MSDK_ALIGN32(nbytes) + ALIGN_TO_PAGE_SIZE(sizeof(sFrame)),
                                     MFX_MEMTYPE_SYSTEM_MEMORY,
                                     pmid);
     if (MFX_ERR_NONE != sts)
@@ -403,7 +395,7 @@ mfxStatus SysMemFrameAllocator::AllocImpl(mfxFrameAllocRequest* request,
     // allocate frames
     for (numAllocated = 0; numAllocated < request->NumFrameSuggested; numAllocated++) {
         mfxStatus sts = m_pBufferAllocator->Alloc(m_pBufferAllocator->pthis,
-                                                  nbytes + MSDK_ALIGN32(sizeof(sFrame)),
+                                                  nbytes + ALIGN_TO_PAGE_SIZE(sizeof(sFrame)),
                                                   request->Type,
                                                   &(mids[numAllocated]));
 
@@ -473,8 +465,8 @@ mfxStatus SysMemBufferAllocator::AllocBuffer(mfxU32 nbytes, mfxU16 type, mfxMemI
     if (0 == (type & MFX_MEMTYPE_SYSTEM_MEMORY))
         return MFX_ERR_UNSUPPORTED;
 
-    mfxU32 header_size = MSDK_ALIGN32(sizeof(sBuffer));
-    mfxU8* buffer_ptr  = (mfxU8*)calloc(header_size + nbytes + 32, 1);
+    mfxU32 header_size = ALIGN_TO_PAGE_SIZE(sizeof(sBuffer));
+    mfxU8* buffer_ptr  = (mfxU8*)calloc(header_size + ALIGN_TO_PAGE_SIZE(nbytes), 1);
 
     if (!buffer_ptr)
         return MFX_ERR_MEMORY_ALLOC;
@@ -498,7 +490,7 @@ mfxStatus SysMemBufferAllocator::LockBuffer(mfxMemId mid, mfxU8** ptr) {
     if (ID_BUFFER != bs->id)
         return MFX_ERR_INVALID_HANDLE;
 
-    *ptr = (mfxU8*)((size_t)((mfxU8*)bs + MSDK_ALIGN32(sizeof(sBuffer)) + 31) & (~((size_t)31)));
+    *ptr = (mfxU8*)ALIGN_TO_PAGE_SIZE(bs + sizeof(sBuffer));
     return MFX_ERR_NONE;
 }
 

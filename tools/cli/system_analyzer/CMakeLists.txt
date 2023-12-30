@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: MIT
 # ##############################################################################
-cmake_minimum_required(VERSION 3.10.2)
+cmake_minimum_required(VERSION 3.13.0)
 project(system_analyzer)
 
 if(UNIX)
@@ -56,4 +56,4 @@ if(UNIX)
 endif()
 
 install(TARGETS ${TARGET} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-                                  COMPONENT dev)
+                                  COMPONENT ${VPL_COMPONENT_TOOLS})

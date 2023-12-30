@@ -22,7 +22,18 @@ void AVCFrameInfo::Reset() {
     m_index = 0;
 }
 
-AVC_Spl::AVC_Spl() : m_WaitForIDR(true), m_currentInfo(0), m_pLastSlice(0), m_lastNalUnit(0) {
+AVC_Spl::AVC_Spl()
+        : m_WaitForIDR(true),
+          m_headers(),
+          m_AUInfo(),
+          m_currentInfo(nullptr),
+          m_pLastSlice(nullptr),
+          m_lastNalUnit(nullptr),
+          m_currentFrame(),
+          m_swappingMemory(),
+          m_slicesStorage(),
+          m_slices(),
+          m_frame() {
     Init();
 }
 
@@ -595,7 +606,7 @@ mfxStatus AVC_Spl::GetFrame(mfxBitstream* bs_in, FrameSplitterInfo** frame) {
             AVCSlice* pSlice = m_pLastSlice;
             mfxStatus sts    = AddSlice(pSlice);
             if (!m_lastNalUnit) {
-                msdk_printf(MSDK_STRING("ERROR: m_lastNalUnit=NULL\n"));
+                printf("ERROR: m_lastNalUnit=NULL\n");
                 return MFX_ERR_NULL_PTR;
             }
             AddSliceNalUnit(m_lastNalUnit, pSlice);

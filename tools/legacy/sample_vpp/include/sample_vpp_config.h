@@ -117,7 +117,7 @@ typedef struct {
 } sDIParam;
 
 typedef struct {
-    msdk_char streamName[MSDK_MAX_FILENAME_LEN];
+    char streamName[MSDK_MAX_FILENAME_LEN];
     mfxVPPCompInputStream compStream;
     mfxU32 streamFourcc;
 } sCompositionStreamInfo;
@@ -221,6 +221,13 @@ private:
     mfxU16 m_viewID;
     mfxU16 m_viewCount;
 };
+
+typedef struct {
+    FilterConfig mode;
+    mfxU16 VideoFullRange;
+    mfxU16 ColourPrimaries;
+    mfxU16 TransferCharacteristics;
+} sVideoSignalInfo;
 
 #endif /* __SAMPLE_VPP_CONFIG_H */
 /* EOF */

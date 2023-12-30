@@ -111,6 +111,7 @@ mfxStatus D3D11FrameAllocator::LockFrame(mfxMemId mid, mfxFrameData* ptr) {
 
             if (DXGI_FORMAT_NV12 != desc.Format && DXGI_FORMAT_420_OPAQUE != desc.Format &&
                 DXGI_FORMAT_YUY2 != desc.Format && DXGI_FORMAT_P8 != desc.Format &&
+                DXGI_FORMAT_R8G8B8A8_UNORM != desc.Format &&
                 DXGI_FORMAT_B8G8R8A8_UNORM != desc.Format && DXGI_FORMAT_R16_UINT != desc.Format &&
                 DXGI_FORMAT_R16_UNORM != desc.Format &&
                 DXGI_FORMAT_R10G10B10A2_UNORM != desc.Format &&
@@ -138,8 +139,7 @@ mfxStatus D3D11FrameAllocator::LockFrame(mfxMemId mid, mfxFrameData* ptr) {
                     hRes =
                         m_pDeviceContext->Map(sr.GetStaging(), 0, mapType, mapFlags, &lockedRect);
                     if (S_OK != hRes && DXGI_ERROR_WAS_STILL_DRAWING != hRes) {
-                        msdk_printf(MSDK_STRING("ERROR: m_pDeviceContext->Map = 0x%08lx\n"),
-                                    (unsigned long int)hRes);
+                        printf("ERROR: m_pDeviceContext->Map = 0x%08lx\n", (unsigned long int)hRes);
                     }
                 } while (DXGI_ERROR_WAS_STILL_DRAWING == hRes);
             }
@@ -198,6 +198,13 @@ mfxStatus D3D11FrameAllocator::LockFrame(mfxMemId mid, mfxFrameData* ptr) {
             ptr->R     = ptr->B + 2;
             ptr->A     = ptr->B + 3;
 
+            break;
+        case DXGI_FORMAT_R8G8B8A8_UNORM:
+            ptr->Pitch = (mfxU16)lockedRect.RowPitch;
+            ptr->R     = (mfxU8*)lockedRect.pData;
+            ptr->G     = ptr->R + 1;
+            ptr->B     = ptr->R + 2;
+            ptr->A     = ptr->R + 3;
             break;
         case DXGI_FORMAT_R10G10B10A2_UNORM:
             ptr->Pitch = (mfxU16)lockedRect.RowPitch;
@@ -365,8 +372,8 @@ mfxStatus D3D11FrameAllocator::AllocImpl(mfxFrameAllocRequest* request,
     DXGI_FORMAT colorFormat = ConverColortFormat(request->Info.FourCC);
 
     if (DXGI_FORMAT_UNKNOWN == colorFormat) {
-        msdk_printf(MSDK_STRING("D3D11 Allocator: invalid fourcc is provided (%#X), exitting\n"),
-                    (unsigned int)request->Info.FourCC);
+        printf("D3D11 Allocator: invalid fourcc is provided (%#X), exitting\n",
+               (unsigned int)request->Info.FourCC);
         return MFX_ERR_UNSUPPORTED;
     }
 
@@ -410,6 +417,8 @@ mfxStatus D3D11FrameAllocator::AllocImpl(mfxFrameAllocRequest* request,
             desc.BindFlags = D3D11_BIND_DECODER;
 
         if ((MFX_MEMTYPE_FROM_VPPIN & request->Type) && (DXGI_FORMAT_YUY2 == desc.Format) ||
+            (MFX_MEMTYPE_FROM_ENCODE & request->Type) &&
+                (DXGI_FORMAT_R8G8B8A8_UNORM == desc.Format) ||
             (DXGI_FORMAT_B8G8R8A8_UNORM == desc.Format) ||
             (DXGI_FORMAT_R10G10B10A2_UNORM == desc.Format) ||
             (DXGI_FORMAT_R16G16B16A16_UNORM == desc.Format)) {
@@ -438,9 +447,9 @@ mfxStatus D3D11FrameAllocator::AllocImpl(mfxFrameAllocRequest* request,
             hRes = m_initParams.pDevice->CreateTexture2D(&desc, NULL, &pTexture2D);
 
             if (FAILED(hRes)) {
-                msdk_printf(MSDK_STRING("CreateTexture2D(%lld) failed, hr = 0x%08lx\n"),
-                            (long long)i,
-                            (unsigned long int)hRes);
+                printf("CreateTexture2D(%lld) failed, hr = 0x%08lx\n",
+                       (long long)i,
+                       (unsigned long int)hRes);
                 return MFX_ERR_MEMORY_ALLOC;
             }
             newTexture.textures.push_back(pTexture2D);
@@ -456,9 +465,9 @@ mfxStatus D3D11FrameAllocator::AllocImpl(mfxFrameAllocRequest* request,
             hRes = m_initParams.pDevice->CreateTexture2D(&desc, NULL, &pTexture2D);
 
             if (FAILED(hRes)) {
-                msdk_printf(MSDK_STRING("Create staging texture(%lld) failed hr = 0x%X\n"),
-                            (long long)i,
-                            (unsigned int)hRes);
+                printf("Create staging texture(%lld) failed hr = 0x%X\n",
+                       (long long)i,
+                       (unsigned int)hRes);
                 return MFX_ERR_MEMORY_ALLOC;
             }
             newTexture.stagingTexture.push_back(pTexture2D);
@@ -503,6 +512,8 @@ DXGI_FORMAT D3D11FrameAllocator::ConverColortFormat(mfxU32 fourcc) {
 
         case MFX_FOURCC_RGB4:
             return DXGI_FORMAT_B8G8R8A8_UNORM;
+        case MFX_FOURCC_BGR4:
+            return DXGI_FORMAT_R8G8B8A8_UNORM;
 
         case MFX_FOURCC_P8:
         case MFX_FOURCC_P8_TEXTURE:

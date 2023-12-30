@@ -71,24 +71,24 @@ public:
     mfxLoader GetLoader() const;
     mfxU32 GetImplIndex() const;
     std::string GetImplName() const;
+    mfxU16 GetImplType() const;
     mfxVersion GetVersion() const;
     std::pair<mfxI16, mfxI32> GetDeviceIDAndAdapter() const;
     mfxU16 GetAdapterType() const;
     void SetMinVersion(mfxVersion const& version);
-#ifdef ONEVPL_EXPERIMENTAL
     mfxStatus SetPCIDevice(mfxI32 domain, mfxI32 bus, mfxI32 device, mfxI32 function);
-    #if defined(_WIN32)
+#if defined(_WIN32)
     mfxStatus SetupLUID(LUID luid);
-    #else
+#else
     mfxStatus SetupDRMRenderNodeNum(mfxU32 DRMRenderNodeNum);
     mfxU32 GetDRMRenderNodeNumUsed();
-    #endif
 #endif
 };
 
 class MainVideoSession : public MFXVideoSession {
 public:
     mfxStatus CreateSession(VPLImplementationLoader* Loader);
+    mfxStatus PrintLibInfo(VPLImplementationLoader* Loader);
 };
 
 #endif //__VPL_IMPLEMENTATION_LOADER_H__

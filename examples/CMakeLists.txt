@@ -3,41 +3,64 @@
 #
 # SPDX-License-Identifier: MIT
 # ##############################################################################
-# oneAPI Video Processing Library (oneVPL) examples
 
-cmake_minimum_required(VERSION 3.10.2)
+cmake_minimum_required(VERSION 3.13.0)
 
 if(BUILD_EXAMPLES)
-  add_subdirectory(coreAPI/legacy-decode)
-  add_subdirectory(coreAPI/legacy-vpp)
-  add_subdirectory(coreAPI/legacy-encode)
-  add_subdirectory(hello/hello-createsession)
-  add_subdirectory(hello/hello-decode)
-  add_subdirectory(hello/hello-decvpp)
-  add_subdirectory(hello/hello-encode)
-  add_subdirectory(hello/hello-transcode)
-  add_subdirectory(hello/hello-vpp)
+  add_subdirectory(api1x_core/legacy-decode)
+  add_subdirectory(api1x_core/legacy-vpp)
+  add_subdirectory(api1x_core/legacy-encode)
+  add_subdirectory(api2x/hello-decode)
+  if(WIN32)
+    add_subdirectory(api2x/hello-sharing-dx11)
+    add_subdirectory(api2x/hello-sharing-ocl)
+  else()
+    add_subdirectory(api2x/hello-sharing-vaapi)
+  endif()
+  add_subdirectory(api2x/hello-decvpp)
+  add_subdirectory(api2x/hello-encode)
+  add_subdirectory(api2x/hello-transcode)
+  add_subdirectory(api2x/hello-vpp)
+  add_subdirectory(tutorials/01_transition/VPL)
 endif()
 
 if(INSTALL_EXAMPLE_CODE)
   install(
     DIRECTORY content
-    DESTINATION ${ONEAPI_INSTALL_EXAMPLEDIR}
-    COMPONENT dev)
+    DESTINATION ${VPL_INSTALL_EXAMPLEDIR}
+    COMPONENT ${VPL_COMPONENT_DEV})
 
   install(
-    DIRECTORY coreAPI/legacy-decode coreAPI/legacy-vpp coreAPI/legacy-encode
-    DESTINATION ${ONEAPI_INSTALL_EXAMPLEDIR}/coreAPI
-    COMPONENT dev)
+    DIRECTORY api1x_core/legacy-decode api1x_core/legacy-vpp
+              api1x_core/legacy-encode
+    DESTINATION ${VPL_INSTALL_EXAMPLEDIR}/api1x_core
+    COMPONENT ${VPL_COMPONENT_DEV})
 
   install(
-    DIRECTORY interop/vpl-infer interop/dpcpp-blur
-    DESTINATION ${ONEAPI_INSTALL_EXAMPLEDIR}/interop
-    COMPONENT dev)
+    DIRECTORY interop/vpl-infer
+    DESTINATION ${VPL_INSTALL_EXAMPLEDIR}/interop
+    COMPONENT ${VPL_COMPONENT_DEV})
 
   install(
-    DIRECTORY hello/hello-createsession hello/hello-decode hello/hello-decvpp
-              hello/hello-encode hello/hello-transcode hello/hello-vpp
-    DESTINATION ${ONEAPI_INSTALL_EXAMPLEDIR}/hello
-    COMPONENT dev)
+    DIRECTORY api2x/hello-decode api2x/hello-decvpp api2x/hello-encode
+              api2x/hello-transcode api2x/hello-vpp
+    DESTINATION ${VPL_INSTALL_EXAMPLEDIR}/api2x
+    COMPONENT ${VPL_COMPONENT_DEV})
+
+  install(
+    DIRECTORY tutorials/01_transition
+    DESTINATION ${VPL_INSTALL_EXAMPLEDIR}/tutorials
+    COMPONENT ${VPL_COMPONENT_DEV})
+
+  if(WIN32)
+    install(
+      DIRECTORY api2x/hello-sharing-dx11 api2x/hello-sharing-ocl
+      DESTINATION ${VPL_INSTALL_EXAMPLEDIR}/api2x
+      COMPONENT ${VPL_COMPONENT_DEV})
+  else()
+    install(
+      DIRECTORY api2x/hello-sharing-vaapi
+      DESTINATION ${VPL_INSTALL_EXAMPLEDIR}/api2x
+      COMPONENT ${VPL_COMPONENT_DEV})
+  endif()
 endif()

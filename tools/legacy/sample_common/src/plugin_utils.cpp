@@ -19,36 +19,28 @@ bool AreGuidsEqual(const mfxPluginUID& guid1, const mfxPluginUID& guid2) {
     return true;
 }
 
-mfxStatus ConvertStringToGuid(const msdk_string& strGuid, mfxPluginUID& mfxGuid) {
+mfxStatus ConvertStringToGuid(const std::string& strGuid, mfxPluginUID& mfxGuid) {
     mfxStatus sts = MFX_ERR_NONE;
 
     // Check if symbolic GUID value
-    std::map<msdk_string, mfxPluginUID> uid;
-    uid[MSDK_STRING("hevcd_sw")] = MFX_PLUGINID_HEVCD_SW;
-    uid[MSDK_STRING("hevcd_hw")] = MFX_PLUGINID_HEVCD_HW;
-
-    uid[MSDK_STRING("hevce_sw")]   = MFX_PLUGINID_HEVCE_SW;
-    uid[MSDK_STRING("hevce_gacc")] = MFX_PLUGINID_HEVCE_GACC;
-    uid[MSDK_STRING("hevce_hw")]   = MFX_PLUGINID_HEVCE_HW;
-
-    uid[MSDK_STRING("vp8d_hw")] = MFX_PLUGINID_VP8D_HW;
-    uid[MSDK_STRING("vp8e_hw")] = MFX_PLUGINID_VP8E_HW;
-
-    uid[MSDK_STRING("vp9d_hw")] = MFX_PLUGINID_VP9D_HW;
-    uid[MSDK_STRING("vp9e_hw")] = MFX_PLUGINID_VP9E_HW;
-
-    uid[MSDK_STRING("camera_hw")] = MFX_PLUGINID_CAMERA_HW;
-
-    uid[MSDK_STRING("capture_hw")] = MFX_PLUGINID_CAPTURE_HW;
-
-    uid[MSDK_STRING("ptir_hw")]    = MFX_PLUGINID_ITELECINE_HW;
-    uid[MSDK_STRING("h264_la_hw")] = MFX_PLUGINID_H264LA_HW;
-    uid[MSDK_STRING("aacd")]       = MFX_PLUGINID_AACD;
-    uid[MSDK_STRING("aace")]       = MFX_PLUGINID_AACE;
-
-    uid[MSDK_STRING("hevce_fei_hw")] = MFX_PLUGINID_HEVCE_FEI_HW;
-
-    if (uid.find(strGuid) == uid.end()) {
+    std::map<std::string, mfxPluginUID> uid{ { "hevcd_sw", MFX_PLUGINID_HEVCD_SW },
+                                             { "hevcd_hw", MFX_PLUGINID_HEVCD_HW },
+                                             { "hevce_sw", MFX_PLUGINID_HEVCE_SW },
+                                             { "hevce_gacc", MFX_PLUGINID_HEVCE_GACC },
+                                             { "hevce_hw", MFX_PLUGINID_HEVCE_HW },
+                                             { "vp8d_hw", MFX_PLUGINID_VP8D_HW },
+                                             { "vp8e_hw", MFX_PLUGINID_VP8E_HW },
+                                             { "vp9d_hw", MFX_PLUGINID_VP9D_HW },
+                                             { "vp9e_hw", MFX_PLUGINID_VP9E_HW },
+                                             { "camera_hw", MFX_PLUGINID_CAMERA_HW },
+                                             { "capture_hw", MFX_PLUGINID_CAPTURE_HW },
+                                             { "ptir_hw", MFX_PLUGINID_ITELECINE_HW },
+                                             { "h264_la_hw", MFX_PLUGINID_H264LA_HW },
+                                             { "aacd", MFX_PLUGINID_AACD },
+                                             { "aace", MFX_PLUGINID_AACE },
+                                             { "hevce_fei_hw", MFX_PLUGINID_HEVCE_FEI_HW } };
+    auto item = uid.find(strGuid);
+    if (item == uid.end()) {
         mfxGuid = MSDK_PLUGINGUID_NULL;
         sts     = MFX_ERR_UNKNOWN;
     }
@@ -65,7 +57,7 @@ mfxStatus ConvertStringToGuid(const msdk_string& strGuid, mfxPluginUID& mfxGuid)
         else {
             for (size_t i = 0; i < 16; i++) {
                 unsigned int xx = 0;
-                msdk_stringstream ss;
+                std::stringstream ss;
                 ss << std::hex << strGuid.substr(i * 2, 2);
                 ss >> xx;
                 mfxGuid.Data[i] = (mfxU8)xx;
@@ -137,7 +129,7 @@ const mfxPluginUID& msdkGetPluginUID(mfxIMPL impl, msdkComponentType type, mfxU3
     return MSDK_PLUGINGUID_NULL;
 }
 
-sPluginParams ParsePluginGuid(msdk_char* strPluginGuid) {
+sPluginParams ParsePluginGuid(const std::string& strPluginGuid) {
     sPluginParams pluginParams;
     mfxPluginUID uid;
     mfxStatus sts = ConvertStringToGuid(strPluginGuid, uid);
@@ -150,14 +142,9 @@ sPluginParams ParsePluginGuid(msdk_char* strPluginGuid) {
     return pluginParams;
 }
 
-sPluginParams ParsePluginPath(msdk_char* strPluginGuid) {
+sPluginParams ParsePluginPath(const std::string& strPluginGuid) {
     sPluginParams pluginParams;
-
-    msdk_char tmpVal[MSDK_MAX_FILENAME_LEN];
-    msdk_opt_read(strPluginGuid, tmpVal);
-
-    MSDK_MAKE_BYTE_STRING(tmpVal, pluginParams.strPluginPath);
-    pluginParams.type = MFX_PLUGINLOAD_TYPE_FILE;
-
+    pluginParams.strPluginPath = std::string(strPluginGuid.begin(), strPluginGuid.end());
+    pluginParams.type          = MFX_PLUGINLOAD_TYPE_FILE;
     return pluginParams;
 }

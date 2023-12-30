@@ -1,4 +1,8 @@
-sample_encode is a oneVPL application that performs preprocessing and encoding of an uncompressed video stream of raw native format (NV12 for GPU) according to a specific video compression standard and can write the encoded video stream to a specified file.  
+sample_encode is a Intel® Video Processing Library (Intel® VPL) application that
+performs preprocessing and encoding of an uncompressed video stream of raw
+native format (NV12 for GPU) according to a specific video compression standard
+and can write the encoded video stream to a specified file.
+
 Command Line format:    
 ```
 sample_encode h264|h265|mpeg2|mvc|jpeg -i InputYUVFile -o OutputEncodedFile -w width -h height -angle 180 -opencl
@@ -16,10 +20,6 @@ Loaded Library configuration:
     Adapter type: integrated  
     DRMRenderNodeNum: 128  
 Used implementation number: 0  
-Loaded modules:  
-   0: /root/samples_test/oneVPL/lib/libvplswref64.so.1  
-   1: /usr/lib/x86_64-linux-gnu/libmfx-gen.so.1.2.7  
-   2: /usr/lib/x86_64-linux-gnu/libmfxhw64.so.1.35  
 
 Input file format       YUV420  
 Output video            HEVC  

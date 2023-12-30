@@ -9,9 +9,11 @@
 
 /* ************************************************************************* */
 
-    #if defined(_WIN32) || defined(_WIN64)
-        #define D3D_SURFACES_SUPPORT
-    #endif // #if defined(_WIN32) || defined(_WIN64)
+    #ifndef D3D_SURFACES_SUPPORT
+        #if defined(_WIN32) || defined(_WIN64)
+            #define D3D_SURFACES_SUPPORT
+        #endif // #if defined(_WIN32) || defined(_WIN64)
+    #endif // #ifndef D3D_SURFACES_SUPPORT
 
     #ifdef D3D_SURFACES_SUPPORT
         #pragma warning(disable : 4201)
@@ -129,6 +131,8 @@ typedef struct _filtersParam {
     sVideoSignalInfoParam* pVideoSignalInfo;
     sMirroringParam* pMirroringParam;
     sColorFillParam* pColorfillParam;
+    sVideoSignalInfo* pVideoSignalInfoIn;
+    sVideoSignalInfo* pVideoSignalInfoOut;
 } sFiltersParam;
 
 struct sInputParams {
@@ -172,18 +176,16 @@ struct sInputParams {
     std::string strDevicePath; // path to device for processing
     #endif
 
-    #ifdef ONEVPL_EXPERIMENTAL
-        #if defined(_WIN32)
+    #if defined(_WIN32)
     LUID luid;
-        #else
+    #else
     mfxU32 DRMRenderNodeNum;
-        #endif
+    #endif
     mfxU32 PCIDomain;
     mfxU32 PCIBus;
     mfxU32 PCIDevice;
     mfxU32 PCIFunction;
     bool PCIDeviceSetup;
-    #endif
 
     mfxU16 adapterType;
     mfxI32 dGfxIdx;
@@ -241,10 +243,10 @@ struct sInputParams {
     /* ********************** */
     /* input\output streams   */
     /* ********************** */
-    msdk_char strSrcFile[MSDK_MAX_FILENAME_LEN];
-    std::vector<msdk_tstring> strDstFiles;
+    char strSrcFile[MSDK_MAX_FILENAME_LEN];
+    std::vector<std::string> strDstFiles;
 
-    msdk_char strPerfFile[MSDK_MAX_FILENAME_LEN];
+    char strPerfFile[MSDK_MAX_FILENAME_LEN];
     mfxU32 forcedOutputFourcc;
 
     /* MFXVideoVPP_Reset */
@@ -258,6 +260,19 @@ struct sInputParams {
     mfxU32 fccSource;
     eAPIVersion verSessionInit;
     bool bReadByFrame;
+
+    bool b3dLut;
+    char lutTableFile[MSDK_MAX_FILENAME_LEN];
+    mfxU16 lutSize;
+    std::vector<mfxU8> lutTbl;
+    std::unique_ptr<mfxU16[]> RGB[3];
+    bool bIs3dLutVideoMem;
+
+    std::vector<sVideoSignalInfo> videoSignalInfoIn;
+    std::vector<sVideoSignalInfo> videoSignalInfoOut;
+
+    std::string m_vpp_cfg;
+    std::string dump_file;
 
     sInputParams()
             : frameInfoIn(),
@@ -285,18 +300,16 @@ struct sInputParams {
     #if defined(LINUX32) || defined(LINUX64)
               strDevicePath(),
     #endif
-    #ifdef ONEVPL_EXPERIMENTAL
-        #if defined(_WIN32)
+    #if defined(_WIN32)
               luid({ 0 }),
-        #else
+    #else
               DRMRenderNodeNum(0),
-        #endif
+    #endif
               PCIDomain(0),
               PCIBus(0),
               PCIDevice(0),
               PCIFunction(0),
               PCIDeviceSetup(false),
-    #endif
               adapterType(mfxMediaAdapterType::MFX_MEDIA_UNKNOWN),
               dGfxIdx(-1),
               adapterNum(-1),
@@ -337,13 +350,22 @@ struct sInputParams {
               resetFrmNums(),
               // inFrameInfo
               numStreams(0),
-              compositionParam({ 0 }),
+              compositionParam({}),
               fccSource(0),
               verSessionInit(API_2X),
-              bReadByFrame(false) {
+              bReadByFrame(false),
+              b3dLut(false),
+              lutSize(0),
+              lutTbl(),
+              bIs3dLutVideoMem(false),
+              videoSignalInfoIn(),
+              videoSignalInfoOut(),
+              m_vpp_cfg(),
+              dump_file() {
         MSDK_ZERO_MEMORY(strSrcFile);
         MSDK_ZERO_MEMORY(strPerfFile);
-        MSDK_ZERO_MEMORY(inFrameInfo)
+        MSDK_ZERO_MEMORY(inFrameInfo);
+        MSDK_ZERO_MEMORY(lutTableFile);
     }
 };
 
@@ -352,10 +374,7 @@ struct sFrameProcessor {
     MainVideoSession mfxSession;
     MFXVideoVPP* pmfxVPP;
     mfxLoader loader = NULL;
-    sFrameProcessor(void) {
-        pmfxVPP = NULL;
-        return;
-    };
+    sFrameProcessor(void) : pLoader(), mfxSession(), pmfxVPP(nullptr), loader(nullptr){};
 };
 
 struct sMemoryAllocator {
@@ -396,7 +415,7 @@ public:
 
     void Close();
 
-    mfxStatus Init(const msdk_char* strFileName, PTSMaker* pPTSMaker, mfxU32 fcc);
+    mfxStatus Init(const char* strFileName, PTSMaker* pPTSMaker, mfxU32 fcc);
 
     mfxStatus PreAllocateFrameChunk(mfxVideoParam* pVideoParam,
                                     sInputParams* pParams,
@@ -413,6 +432,10 @@ public:
                                 mfxU8* buf_read);
     mfxStatus LoadNextFrame(mfxFrameData* pData, mfxFrameInfo* pInfo);
     mfxStatus LoadNextFrame(mfxFrameSurface1* pSurface, int bytes_to_read, mfxU8* buf_read);
+
+protected:
+    CRawVideoReader(CRawVideoReader const&)                  = delete;
+    const CRawVideoReader& operator=(CRawVideoReader const&) = delete;
 
 private:
     mfxStatus GetPreAllocFrame(mfxFrameSurfaceWrap** pSurface);
@@ -434,14 +457,16 @@ public:
 
     void Close();
 
-    mfxStatus Init(const msdk_char* strFileName,
-                   PTSMaker* pPTSMaker,
-                   mfxU32 forcedOutputFourcc = 0);
+    mfxStatus Init(const char* strFileName, PTSMaker* pPTSMaker, mfxU32 forcedOutputFourcc = 0);
 
     mfxStatus PutNextFrame(sMemoryAllocator* pAllocator,
                            mfxFrameInfo* pInfo,
                            mfxFrameSurfaceWrap* pSurface);
     mfxStatus PutNextFrame(mfxFrameInfo* pInfo, mfxFrameSurfaceWrap* pSurface);
+
+protected:
+    CRawVideoWriter(CRawVideoWriter const&)                  = delete;
+    const CRawVideoWriter& operator=(CRawVideoWriter const&) = delete;
 
 private:
     mfxStatus WriteFrame(mfxFrameData* pData, mfxFrameInfo* pInfo);
@@ -459,7 +484,7 @@ public:
 
     void Close();
 
-    mfxStatus Init(const msdk_char* strFileName,
+    mfxStatus Init(const char* strFileName,
                    PTSMaker* pPTSMaker,
                    sSVCLayerDescr* pDesc     = NULL,
                    mfxU32 forcedOutputFourcc = 0);
@@ -485,7 +510,7 @@ public:
         mfxFrameSurfaceWrap* pSurface;
         mfxExtVppAuxData* pExtVpp;
     };
-    SurfaceVPPStore(){};
+    SurfaceVPPStore() : m_SyncPoints(){};
 
     typedef std::pair<mfxSyncPoint, SurfVPPExt> SyncPair;
     std::list<SyncPair> m_SyncPoints;
@@ -514,13 +539,18 @@ struct sAppResources {
     ////MSDK API 1.5
     //mfxExtVPPSkinTone              steConfig;
     //mfxExtVPPColorSaturationLevel  tccConfig;
+
+    mfxFrameAllocResponse* p3dlutResponse;
 };
 
 /* ******************************************************************* */
 /*                        service functions                            */
 /* ******************************************************************* */
+void PrintLibInfo(sFrameProcessor* pProcessor);
 
-void PrintInfo(sInputParams* pParams, mfxVideoParam* pMfxParams, MFXVideoSession* pMfxSession);
+void PrintStreamInfo(sInputParams* pParams,
+                     mfxVideoParam* pMfxParams,
+                     MFXVideoSession* pMfxSession);
 
 void PrintDllInfo();
 
@@ -538,23 +568,25 @@ mfxStatus GetFreeSurface(mfxFrameSurfaceWrap* pSurfacesPool,
                          mfxU16 nPoolSize,
                          mfxFrameSurfaceWrap** ppSurface);
 
-const msdk_char* IOpattern2Str(mfxU32 IOpattern);
+const char* IOpattern2Str(mfxU32 IOpattern);
 
-mfxStatus vppParseInputString(msdk_char* strInput[],
-                              mfxU8 nArgNum,
+mfxStatus vppParseInputString(char* strInput[],
+                              mfxU32 nArgNum,
                               sInputParams* pParams,
                               sFiltersParam* pDefaultFiltersParam);
 
-bool CheckInputParams(msdk_char* strInput[], sInputParams* pParams);
+bool CheckInputParams(char* strInput[], sInputParams* pParams);
 
-void vppPrintHelp(const msdk_char* strAppName, const msdk_char* strErrorMessage);
+void vppPrintHelp(const char* strAppName, const char* strErrorMessage);
 
 mfxStatus ConfigVideoEnhancementFilters(sInputParams* pParams,
                                         sAppResources* pResources,
                                         mfxU32 paramID);
 
-const msdk_char* PicStruct2Str(mfxU16 PicStruct);
+mfxStatus Config3dlut(sInputParams* pParams, sAppResources* pResources);
 
-mfxStatus ParseCompositionParfile(const msdk_char* parFileName, sInputParams* pParams);
+const char* PicStruct2Str(mfxU16 PicStruct);
+
+mfxStatus ParseCompositionParfile(const char* parFileName, sInputParams* pParams);
 #endif /* __SAMPLE_VPP_UTILS_H */
 /* EOF */

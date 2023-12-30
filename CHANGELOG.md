@@ -4,6 +4,141 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+This project is part of the Intel® Video Processing Library (Intel® VPL), a
+programming interface for video decoding, encoding, and processing to build
+portable media pipelines on CPUs, GPUs, and other accelerators.
+
+## [Unreleased]
+
+## [2.10.1] - 2023-12-22
+
+### Added
+- Intel® VPL specification and associated build scripts
+
+### Changed
+- Project name to Intel® Video Processing Library (Intel® VPL)
+- Project versioning scheme to align with library and API version
+
+## [2023.4.0] - 2023-12-01
+
+### Added
+- Intel® VPL API 2.10 support
+- New command line parameters to sample_multi_transcode for setting
+  B Frame QP Offsets based on Pyramid Level
+- New command line parameters to the sample_vpp tool to enable video signal
+  information
+- New APIs for importing and exporting shared surfaces
+- New APIs for string-based parameter configuration
+
+### Removed
+- Environment module support
+- Unused files and folders
+
+### Fixed
+- NV12 wayland render for MTL
+- Buffer starvation when wayland window is moved
+- Missing profile strings in vpl-inspect tool
+- Rdrm to use card node instead of render node
+- Rdrm tile4 selection based DRM/KMS query
+- Rdrm NV12 and P010 render for MTL
+
+### Changed
+- Directory layout and name of dispatcher directory
+- Location of image files used by documentation
+- Runtime library search path to remove current directory
+
+## [2023.3.1] - 2023-07-21
+
+### Added
+- Three new command line parameters to the sample_multi_transcode tool to enable
+  video quality tuning for different use cases.
+- New command line parameter to the sample_multi_transcode tool to enable
+  adaptiveCQM control
+
+### Removed
+- Outdated docker files
+
+### Fixed
+- Unsafe calling of SetCurrentDirectory during MFXEnumImplementations
+- Parameter parsing in sample_vpp tool
+
+## [2023.3.0] - 2023-05-31
+
+### Removed
+- USE_ONEAPI_INSTALL_LAYOUT build shortcut
+- '-sw' option from examples
+
+### Added
+- New MFXSetConfigFilterProperty property: `mfxExtendedDeviceId.RevisionID`
+
+### Fixed
+- Fix HDR luminance value
+- Handling of special cases of CMAKE_INSTALL_PREFIX
+- X11 rendering corruption issue
+- Intel® Distribution of OpenVINO™ Toolkit installation steps in vpl-infer README
+- Intermittent Sample_multi_transcode segfault on wayland
+
+### Changed
+- quick-start scripts to be more simple and easy to use
+
+## [2023.2.1] - 2023-04-14
+
+### Added
+- Documentation on security policy and vulnerability reporting process
+
+### Removed
+- Fix for VPP processing for YUV input
+
+## [2023.2.0] - 2023-04-07
+
+### Added
+- Intel® VPL API 2.9 support
+- Perceptual encoding prefilter option to sample_multi_transcode
+
+### Fixed
+- VPP processing for YUV input
+- Sample_multi_transcode segfault on wayland
+- Missing prerequisites in vpl-infer README
+
+### Changed
+- vpl-infer Dockerfile and Linux setup steps to better align with https://dgpu-docs.intel.com/
+
+### Removed
+- dpcpp-blur example
+
+## [2023.1.3] - 2023-03-03
+
+### Added
+ - New tutorial on transitioning from Media SDK to Intel® VPL replaces hello-createsession
+ - More logs in sample tools to inform correct parameters for hyper encode mode
+
+### Fixed
+- vpl-infer README.md to specify python version supported by OpenVINO™ toolkit
+- Printing incorrect library information of sample tools
+- Issues discovered from static analysis
+
+### Changed
+- README.md and INSTALL.md to clarify setup steps
+
+## [2023.1.2] - 2023-01-27
+
+### Added
+- Instructions on how to use vpl-infer with official Intel® Deep Learning
+  Streamer (Intel® DL Streamer) docker images by platform
+- Support for zero-copy to vpl-infer example on Windows
+
+### Fixed
+- vpl-infer Dockerfile failing to work in iGPU (Gen12) and to work with recent
+  OpenVINO™ toolkit repository label change
+- Warnings reported by Clang
+- Hardening flags being incorrectly set on Linux executables
+
+### Changed
+- Example directory names to clarify API level used
+- vpl-infer to support OpenVINO™ toolkit 2022.3.0
+- Version of GoogleTest to 1.12.1
+- Compilation flags to enable Control Flow Guard on Windows
+
 ## [2023.1.1] - 2022-12-23
 
 ### Added
@@ -17,7 +152,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2023.1.0] - 2022-11-10
 
 ### Added
-- oneVPL API 2.8 support
+- Intel® VPL API 2.8 support
 - New infer sample
 - xdg_shell for weston10
 
@@ -66,7 +201,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2022.2.0] - 2022-07-22
 
 ### Added
-- oneVPL API 2.7 support
+- Intel® VPL API 2.7 support
 - Experimental DeviceCopy option for GPU-accelerated surface copying
 - Ability to select host or device responsible for the memory copy between host
   and device
@@ -75,7 +210,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   call this callback
 - Pass through extension buffer to mfxInitializationParam via config filter property
 - Interface to get statistics after encode to Experimental API
-- Support for Alder Lake N and Intel(R) Data Center GPU Flex Series (formerly Arctic Sound-M)
+- Support for Alder Lake N and Intel® Data Center GPU Flex Series (formerly Arctic Sound-M)
 - Linux system_analyzer tool for improved runtime environment visibility
 
 ### Changed
@@ -94,7 +229,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build fails against libva installed at custom location
 - Unclear error when advanced-decvpp-infer runs on unsupported platform
 - Incomplete Linux instructions for dpcpp-blur sample
-- Outdated OpenVINO path in interop Samples README
+- Outdated OpenVINO™ toolkit path in interop Samples README
 - dpcpp-blur sample not returning clear error when build attempted on
   unsupported operating systems
 - `MFXEnumImplementation` not returning `MFX_ERR_NOT_FOUND` on non-Intel systems
@@ -117,20 +252,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2022.1.0] - 2022-03-18
 
 ### Added
-- oneVPL API 2.6 support
+- Intel® VPL API 2.6 support
 - `ONEVPL_PRIORITY_PATH` environment variable for runtime loading
 - Multi-adapter support for most combinations of GPU hardware that works with
-  Intel(R) Media SDK and oneVPL
+  Intel® Media SDK and Intel® VPL
 - Documentation on working with multiple adapters using 2.x API
 - Support for extended device ID on legacy GPUs
-- Support for Intel(R) Ar(TM) A Series Graphics
+- Support for Intel® Arc™ A Series Graphics
 - Rocky Linux* support
 - Windows* 11 support
 - Windows* Server 2022 support
 - Microsoft Visual Studio* 2022 support
 
 ### Changed
-- Runtime loading to use Intel(R) Media SDK when DX9 is requested
+- Runtime loading to use Intel® Media SDK when DX9 is requested
 
 ### Deprecated
 - Support for Microsoft Visual Studio* 2017
@@ -159,9 +294,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - mfxvideo++.h to remove deprecation warnings
-- Sample* tools to select oneVPL 2.x APIs by default
+- Sample* tools to select Intel® VPL 2.x APIs by default
 - Python previews to target Python 3.7
-- Documentation and build for OpenVINO interop sample
+- Documentation and build for OpenVINO™ toolkit interop sample
 
 ### Removed
 - Previously depreciated libmfx.dll and libmfx.so.2021.1.11 libraries
@@ -169,7 +304,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2021.6.0] - 2021-09-13
 
 ### Added
-- oneVPL API 2.4 support
+- Intel® VPL API 2.4 support
 - Internal memory support for dpcpp-blur sample
 
 ## [2021.5.0] - 2021-08-03
@@ -188,8 +323,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- oneVPL API 2.4 support
-- Advanced OpenVINO interop sample w/ remoteBlob support (Linux only)
+- Intel® VPL API 2.4 support
+- Advanced OpenVINO™ toolkit interop sample w/ remoteBlob support (Linux only)
 - C++ API and Samples (Preview)
 - Python API and Samples (Preview)
 - Dispatcher logging capability
@@ -200,19 +335,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2021.2.2] - 2021-04-01
 
 ### Added
-- oneVPL API 2.2 support
-- Legacy Intel(R) Media SDK test tools (with CPU and GPU support)
-- Intel(R) Media SDK to oneVPL migration guide
+- Intel® VPL API 2.2 support
+- Legacy Intel® Media SDK test tools (with CPU and GPU support)
+- Intel® Media SDK to Intel® VPL migration guide
 - pkg-config support
 - 32-bit Windows* support
 - Legacy mfxvideo++ header
-- New Preview Sample: oneVPL-OpenVINO Interop Sample
+- New Preview Sample: Intel® VPL OpenVINO™ toolkit Interop Sample
 - Ubuntu 20.10 support
 
 ## [2021.1] - 2020-12-08
 
 ### Added
-- oneVPL dispatcher implementation supporting oneVPL API 2.0
+- Intel® VPL dispatcher implementation supporting Intel® VPL API 2.0
 - Frame memory interface with access to internally allocated buffers
 - hello-decode sample
 - hello-encode sample
@@ -221,29 +356,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - hello-transcode sample
 
 
-[Unreleased]: https://github.com/oneapi-src/oneVPL/compare/v2023.1.0...HEAD
-[2023.1.0]: https://github.com/oneapi-src/oneVPL/compare/v2023.0.0...v2023.1.0
-[2023.0.0]: https://github.com/oneapi-src/oneVPL/compare/v2022.2.4...v2023.0.0
-[2022.2.4]: https://github.com/oneapi-src/oneVPL/compare/v2022.2.3...v2022.2.4
-[2022.2.3]: https://github.com/oneapi-src/oneVPL/compare/v2022.2.2...v2022.2.3
-[2022.2.2]: https://github.com/oneapi-src/oneVPL/compare/v2022.2.1...v2022.2.2
-[2022.2.1]: https://github.com/oneapi-src/oneVPL/compare/v2022.2.0...v2022.2.1
-[2022.2.0]: https://github.com/oneapi-src/oneVPL/compare/v2022.1.6...v2022.2.0
-[2022.1.6]: https://github.com/oneapi-src/oneVPL/compare/v2022.1.5...v2022.1.6
-[2022.1.5]: https://github.com/oneapi-src/oneVPL/compare/v2022.1.4...v2022.1.5
-[2022.1.4]: https://github.com/oneapi-src/oneVPL/compare/v2022.1.3...v2022.1.4
-[2022.1.3]: https://github.com/oneapi-src/oneVPL/compare/v2022.1.2...v2022.1.3
-[2022.1.2]: https://github.com/oneapi-src/oneVPL/compare/v2022.1.1...v2022.1.2
-[2022.1.1]: https://github.com/oneapi-src/oneVPL/compare/v2022.1.0...v2022.1.1
-[2022.1.0]: https://github.com/oneapi-src/oneVPL/compare/v2022.0.6...v2022.1.0
-[2022.0.6]: https://github.com/oneapi-src/oneVPL/compare/v2022.0.5...v2022.0.6
-[2022.0.5]: https://github.com/oneapi-src/oneVPL/compare/v2022.0.4...v2022.0.5
-[2022.0.4]: https://github.com/oneapi-src/oneVPL/compare/v2022.0.3...v2022.0.4
-[2022.0.3]: https://github.com/oneapi-src/oneVPL/compare/v2022.0.2...v2022.0.3
-[2022.0.2]: https://github.com/oneapi-src/oneVPL/compare/v2022.0.0...v2022.0.2
-[2022.0.0]: https://github.com/oneapi-src/oneVPL/compare/v2021.6.0...v2022.0.0
-[2021.6.0]: https://github.com/oneapi-src/oneVPL/compare/v2021.5.0...v2021.6.0
-[2021.5.0]: https://github.com/oneapi-src/oneVPL/compare/v2021.4.0...v2021.5.0
-[2021.4.0]: https://github.com/oneapi-src/oneVPL/compare/v2021.2.2...v2021.4.0
-[2021.2.2]: https://github.com/oneapi-src/oneVPL/compare/v2021.1]:...v2021.2.2
-[2021.1]: https://github.com/oneapi-src/oneVPL/releases/tag/v2021.1
+[Unreleased]: https://github.com/intel/libvpl/compare/v2023.4.0...HEAD
+[2023.4.0]: https://github.com/intel/libvpl/compare/v2023.3.1...v2023.4.0
+[2023.3.1]: https://github.com/intel/libvpl/compare/v2023.3.0...v2023.3.1
+[2023.3.0]: https://github.com/intel/libvpl/compare/v2023.2.1...v2023.3.0
+[2023.2.1]: https://github.com/intel/libvpl/compare/v2023.2.0...v2023.2.1
+[2023.2.0]: https://github.com/intel/libvpl/compare/v2023.1.3...v2023.2.0
+[2023.1.3]: https://github.com/intel/libvpl/compare/v2023.1.2...v2023.1.3
+[2023.1.2]: https://github.com/intel/libvpl/compare/v2023.1.1...v2023.1.2
+[2023.1.1]: https://github.com/intel/libvpl/compare/v2023.1.0...v2023.1.1
+[2023.1.0]: https://github.com/intel/libvpl/compare/v2023.0.0...v2023.1.0
+[2023.0.0]: https://github.com/intel/libvpl/compare/v2022.2.4...v2023.0.0
+[2022.2.4]: https://github.com/intel/libvpl/compare/v2022.2.3...v2022.2.4
+[2022.2.3]: https://github.com/intel/libvpl/compare/v2022.2.2...v2022.2.3
+[2022.2.2]: https://github.com/intel/libvpl/compare/v2022.2.1...v2022.2.2
+[2022.2.1]: https://github.com/intel/libvpl/compare/v2022.2.0...v2022.2.1
+[2022.2.0]: https://github.com/intel/libvpl/compare/v2022.1.6...v2022.2.0
+[2022.1.6]: https://github.com/intel/libvpl/compare/v2022.1.5...v2022.1.6
+[2022.1.5]: https://github.com/intel/libvpl/compare/v2022.1.4...v2022.1.5
+[2022.1.4]: https://github.com/intel/libvpl/compare/v2022.1.3...v2022.1.4
+[2022.1.3]: https://github.com/intel/libvpl/compare/v2022.1.2...v2022.1.3
+[2022.1.2]: https://github.com/intel/libvpl/compare/v2022.1.1...v2022.1.2
+[2022.1.1]: https://github.com/intel/libvpl/compare/v2022.1.0...v2022.1.1
+[2022.1.0]: https://github.com/intel/libvpl/compare/v2022.0.6...v2022.1.0
+[2022.0.6]: https://github.com/intel/libvpl/compare/v2022.0.5...v2022.0.6
+[2022.0.5]: https://github.com/intel/libvpl/compare/v2022.0.4...v2022.0.5
+[2022.0.4]: https://github.com/intel/libvpl/compare/v2022.0.3...v2022.0.4
+[2022.0.3]: https://github.com/intel/libvpl/compare/v2022.0.2...v2022.0.3
+[2022.0.2]: https://github.com/intel/libvpl/compare/v2022.0.0...v2022.0.2
+[2022.0.0]: https://github.com/intel/libvpl/compare/v2021.6.0...v2022.0.0
+[2021.6.0]: https://github.com/intel/libvpl/compare/v2021.5.0...v2021.6.0
+[2021.5.0]: https://github.com/intel/libvpl/compare/v2021.4.0...v2021.5.0
+[2021.4.0]: https://github.com/intel/libvpl/compare/v2021.2.2...v2021.4.0
+[2021.2.2]: https://github.com/intel/libvpl/compare/v2021.1]:...v2021.2.2
+[2021.1]: https://github.com/intel/libvpl/releases/tag/v2021.1
